@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Google Trace Nested Demo" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <option name="ACTIVE_PROFILES" value="nested" />
+    <module name="google-trace" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="io.axoniq.demo.tracing.GoogleTraceDemoApplication" />
+    <option name="VM_PARAMETERS" value="-Dio.opentelemetry.context.enableStrictContext=true" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="io.axoniq.demo.tracing.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

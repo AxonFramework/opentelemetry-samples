@@ -1,0 +1,106 @@
+$primary: #1374cf;
+$secondary: #FE5E00;
+$success: #47BF4A;
+$info: #00B7BF;
+$danger: #D33333;
+$warning: #FE5E00;
+$light: #ECEDEE;
+$dark: #21252B;
+$body-bg: $light;
+$nav-tabs-link-active-bg: #FFFFFF;
+
+$input-bg: #FFFFFF;
+
+$font-family-base: Lato;
+$font-family-sans-serif: sans-serif;
+
+@import "~bootstrap/scss/functions";
+@import "~bootstrap/scss/variables";
+@import "~bootstrap/scss/maps";
+@import "~bootstrap/scss/mixins";
+@import "~bootstrap/scss/utilities";
+
+// Layout & components
+@import "~bootstrap/scss/root";
+@import "~bootstrap/scss/reboot";
+@import "~bootstrap/scss/type";
+@import "~bootstrap/scss/images";
+@import "~bootstrap/scss/containers";
+@import "~bootstrap/scss/grid";
+@import "~bootstrap/scss/tables";
+@import "~bootstrap/scss/forms";
+@import "~bootstrap/scss/buttons";
+@import "~bootstrap/scss/transitions";
+@import "~bootstrap/scss/dropdown";
+@import "~bootstrap/scss/button-group";
+@import "~bootstrap/scss/nav";
+@import "~bootstrap/scss/navbar";
+@import "~bootstrap/scss/card";
+//@import "~bootstrap/scss/accordion";
+//@import "~bootstrap/scss/breadcrumb";
+@import "~bootstrap/scss/pagination";
+//@import "~bootstrap/scss/badge";
+@import "~bootstrap/scss/alert";
+//@import "~bootstrap/scss/progress";
+@import "~bootstrap/scss/list-group";
+@import "~bootstrap/scss/close";
+@import "~bootstrap/scss/toasts";
+@import "~bootstrap/scss/modal";
+//@import "~bootstrap/scss/tooltip";
+//@import "~bootstrap/scss/popover";
+//@import "~bootstrap/scss/carousel";
+@import "~bootstrap/scss/spinners";
+@import "~bootstrap/scss/offcanvas";
+//@import "~bootstrap/scss/placeholders";
+
+// Helpers
+@import "~bootstrap/scss/helpers";
+
+// Utilities
+@import "~bootstrap/scss/utilities/api";
+
+
+h1 {
+  font-size: 28px;
+  font-weight: 800
+}
+
+h2 {
+  font-size: 20px;
+  font-weight: 600
+}
+h3 {
+  font-size: 16px;
+  font-weight: 600
+}
+
+.container-fluid {
+  --bs-gutter-x: 0
+}
+
+a {
+  text-decoration: none;
+}
+
+.main-content {
+  .nav-item {
+    --bs-nav-link-padding-y: 0.2rem;
+
+    .active {
+      background-color: $primary !important;
+      color: $white !important;
+    }
+  }
+}
+
+
+.nav-item {
+  --bs-nav-link-padding-y: 0.2rem;
+}
+
+.table-borderless tr {
+  border-bottom-width: 0;
+}
+tr td, tr th {
+  padding: 0.2rem !important;
+}

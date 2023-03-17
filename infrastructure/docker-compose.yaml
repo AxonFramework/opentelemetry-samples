@@ -1,0 +1,208 @@
+version: '3'
+services:
+  opensearch-node1:
+    image: opensearchproject/opensearch:latest
+    container_name: opensearch-node1
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node1
+      - discovery.seed_hosts=opensearch-node1
+      - cluster.initial_cluster_manager_nodes=opensearch-node1
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data1:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+
+  jaeger-query:
+    image: jaegertracing/jaeger-query:latest
+    container_name: jaeger-query
+    restart: on-failure
+    ports:
+      - "9000:16686"
+    environment:
+      - SPAN_STORAGE_TYPE=opensearch
+      - ES_TAGS_AS_FIELDS_ALL=true
+      - ES_USERNAME=admin
+      - ES_PASSWORD=admin
+      - ES_SERVER_URLS=https://opensearch-node1:9200
+      - ES_TLS_ENABLED=true
+      - ES_TLS_SKIP_HOST_VERIFY=true
+    depends_on:
+      - opensearch-node1
+
+  jaeger-collector:
+    image: jaegertracing/jaeger-collector:latest
+    ports:
+      - "14269:14269"
+      - "14268:14268"
+      - "14267:14267"
+      - "14250:14250"
+      - "9411:9411"
+      - "4317:4317"
+    restart: on-failure
+    environment:
+      - SPAN_STORAGE_TYPE=opensearch
+      - ES_TAGS_AS_FIELDS_ALL=true
+      - ES_USERNAME=admin
+      - ES_PASSWORD=admin
+      - ES_TLS_SKIP_HOST_VERIFY=true
+    command: [
+      "--es.server-urls=https://opensearch-node1:9200",
+      "--es.tls.enabled=true",
+      "--collector.otlp.enabled=true"
+    ]
+    depends_on:
+      - opensearch-node1
+
+  jaeger-agent:
+    image: jaegertracing/jaeger-agent:latest
+    hostname: jaeger-agent
+    command: ["--reporter.grpc.host-port=jaeger-collector:14250"]
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+
+    restart: on-failure
+    environment:
+      - SPAN_STORAGE_TYPE=opensearch
+    depends_on:
+      - jaeger-collector
+
+  axon-server-1:
+    image: axoniq/axonserver:4.6.5
+    ports:
+      - "9024:8024"
+      - "9124:8124"
+    volumes:
+      - data-as-1:/axonserver/data
+      - events-as-1:/axonserver/events
+
+
+  service-participants:
+    image: service-participants
+    ports:
+      - '8081:8080'
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=service.name\=Participants,service.version\=0.0.1,deployment.environment\=production
+      - OTEL_SERVICE_NAME=Participants
+      - OTEL_TRACES_EXPORTER=jaeger
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger-collector:14250
+      - OTEL_METRICS_EXPORTER=none
+      - AXON_AXONSERVER_SERVERS=axon-server-1:8124
+      - MM_TAG_APP=participants
+      - MM_TAG_SERVER=morlack-laptop
+    depends_on:
+      - jaeger-collector
+      - axon-server-1
+
+
+  service-auction-object-registry:
+    image: service-auction-object-registry
+    ports:
+      - '8082:8080'
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=service.name\=AuctionObjectRegistry,service.version\=0.0.1,deployment.environment\=production
+      - OTEL_SERVICE_NAME=AuctionObjectRegistry
+      - OTEL_TRACES_EXPORTER=jaeger
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger-collector:14250
+      - OTEL_METRICS_EXPORTER=none
+      - AXON_AXONSERVER_SERVERS=axon-server-1:8124
+      - MM_TAG_APP=auction-object-registry
+      - MM_TAG_SERVER=morlack-laptop
+    depends_on:
+      - jaeger-collector
+      - axon-server-1
+
+
+  service-auction-query:
+    image: service-auction-query
+    ports:
+      - '8083:8080'
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=service.name\=AuctionQueries,service.version\=0.0.1,deployment.environment\=production
+      - OTEL_SERVICE_NAME=AuctionQueries
+      - OTEL_TRACES_EXPORTER=jaeger
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger-collector:14250
+      - OTEL_METRICS_EXPORTER=none
+      - AXON_AXONSERVER_SERVERS=axon-server-1:8124
+      - MM_TAG_APP=auction-query
+      - MM_TAG_SERVER=morlack-laptop
+    depends_on:
+      - jaeger-collector
+      - axon-server-1
+
+  service-auctions:
+    image: service-auctions
+    ports:
+      - '8201:8080'
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=service.name\=Auctions,service.version\=0.0.1,deployment.environment\=production
+      - OTEL_SERVICE_NAME=Auctions
+      - OTEL_TRACES_EXPORTER=jaeger
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger-collector:14250
+      - OTEL_METRICS_EXPORTER=none
+      - AXON_AXONSERVER_SERVERS=axon-server-1:8124
+      - MM_TAG_APP=auctions
+      - MM_TAG_SERVER=morlack-laptop
+    depends_on:
+      - jaeger-collector
+      - axon-server-1
+
+  service-interfaces:
+    image: service-interfaces
+    ports:
+      - '8087:8080'
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=service.name\=Interfaces,service.version\=0.0.1,deployment.environment\=production
+      - OTEL_SERVICE_NAME=Interfaces
+      - OTEL_TRACES_EXPORTER=jaeger
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger-collector:14250
+      - OTEL_METRICS_EXPORTER=none
+      - AXON_AXONSERVER_SERVERS=axon-server-1:8124
+      - MM_TAG_APP=interfaces
+      - MM_TAG_SERVER=morlack-laptop-2
+    depends_on:
+      - jaeger-collector
+      - axon-server-1
+
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-storage:/prometheus
+    depends_on:
+      - axon-server-1
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - ./grafana.ini:/etc/grafana/grafana.ini
+      - ./grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yaml
+      - grafana-storage:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+
+volumes:
+  grafana-storage:
+  prometheus-storage:
+  opensearch-data1:
+  data-as-1:
+  events-as-1:

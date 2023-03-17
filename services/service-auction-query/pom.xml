@@ -6,10 +6,9 @@
 
     <parent>
         <groupId>io.axoniq.demo.tracing</groupId>
-        <artifactId>axoniq-tracing-demo</artifactId>
+        <artifactId>services</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
-    <artifactId>core</artifactId>
-    <name>Axon OpenTelemetry Demo core</name>
-    <description>Contains all business logic for the demo application</description>
+    <artifactId>service-auction-query</artifactId>
+    <name>Auction Query service</name>
 </project>

@@ -16,22 +16,38 @@
 
 package io.axoniq.demo.tracing.interfaces.simulation
 
+import java.time.Instant
+
 data class SimulatedParticipantDto(
     val id: String,
     val terminated: Boolean,
     val email: String,
     val balance: Long,
-    val activeBids: Map<String, Long>,
+    val activeBids: List<ActiveBidDto>,
     val items: List<ParticipantItem>,
 )
 
-
-data class SimulatedParticipantDtoResponse(
-    val participants: List<SimulatedParticipantDto>
+data class ActiveBidDto(
+    val auctionId: String,
+    val objectId: String,
+    val objectName: String,
+    val bid: Long,
+    val interest: Double,
+    val receivedWinUpdate: Boolean,
+    val receivedBalanceUpdate: Boolean,
+    val receivedItemUpdate: Boolean,
 )
 
 data class ParticipantItem(
     val id: String,
     val name: String,
+    val boughtFor: Long,
     val auctioning: Boolean,
+    val auctionStarted: Instant?,
+    val receivedBalanceUpdate: Boolean?,
+    val receivedItemUpdate: Boolean?,
+)
+
+data class SimulatedParticipantDtoResponse(
+    val participants: List<SimulatedParticipantDto>
 )

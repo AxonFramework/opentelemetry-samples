@@ -43,7 +43,7 @@ class TransferOfOwnershipSaga {
     @StartSaga
     @SagaEventHandler(associationProperty = "auctionId")
     fun on(event: AuctionEnded, commandGateway: CommandGateway) {
-        if (event.winningParticipant == null || event.winningPrice == null) {
+        if (event.winningParticipant == null || event.winningPrice == null ) {
             SagaLifecycle.end()
             return
         }

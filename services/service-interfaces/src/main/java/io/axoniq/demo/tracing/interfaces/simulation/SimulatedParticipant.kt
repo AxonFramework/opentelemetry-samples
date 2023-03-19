@@ -32,7 +32,6 @@ import reactor.core.Disposable
 import reactor.core.scheduler.Schedulers
 import java.time.Instant
 import java.util.concurrent.ConcurrentSkipListMap
-import kotlin.math.abs
 
 class SimulatedParticipant(
     private val id: String,
@@ -40,23 +39,91 @@ class SimulatedParticipant(
     private val auctionHouseId: String,
     private val queryGateway: QueryGateway,
     private val commandGateway: CommandGateway,
-    private val spanFactory: SpanFactory
+    private val spanFactory: SpanFactory,
 ) {
+    private val biddingFactor = Math.random()
     private lateinit var activeAuctionSubscription: Disposable
     private lateinit var balanceSubscription: Disposable
     private lateinit var ownershipSubscription: Disposable
     private lateinit var auctionLoopSubscription: Disposable
-    private val logger = LoggerFactory.getLogger(this::class.java)
-    private var balance: Long = 0
-    private var lastPlacedAuction: Instant = Instant.now()
 
-    private val interestMap = ConcurrentSkipListMap<String, Double>()
-    private val committedAuctionMoney = ConcurrentSkipListMap<String, Long>()
-    private val boughtPendingItems = ConcurrentSkipListMap<String, Long>()
-    private val currentItems: MutableMap<String, AuctionOwnershipInfoItem> = ConcurrentSkipListMap()
-    private val currentAuctions: MutableList<String> = mutableListOf()
-    private val currentAuctionsTime: MutableMap<String, Instant> = mutableMapOf()
-    private val scheduler = Schedulers.newSingle(email)
+    private val logger = LoggerFactory.getLogger(this::class.java)
+    private val scheduler = Schedulers.boundedElastic()
+
+    private var balance: Long = 0
+
+    private val itemNames = ConcurrentSkipListMap<String, String>()
+    private val items: MutableMap<String, ItemInPossession> = ConcurrentSkipListMap()
+    private val auctions: MutableMap<String, ActiveAuction> = ConcurrentSkipListMap()
+    private val bids: MutableMap<String, ActiveBid> = ConcurrentSkipListMap()
+
+    inner class ItemInPossession(
+        val identifier: String,
+        val name: String,
+        val boughtFor: Long,
+    )
+
+    /**
+     * Represents an auction that I am participating in
+     */
+    inner class ActiveAuction(
+        val objectId: String,
+        val objectName: String,
+        var commandSentAt: Instant = Instant.now(),
+        var auctionId: String? = null,
+        var createdAt: Instant? = null,
+        var receivedBalanceUpdate: Boolean = false,
+        var receivedItemUpdate: Boolean = false,
+    ) {
+        fun cleanIfComplete() {
+            if (!receivedBalanceUpdate || !receivedItemUpdate) {
+                return
+            }
+            auctions.remove(this.objectId)
+        }
+
+        fun markItemUpdated() {
+            this.receivedItemUpdate = true
+            cleanIfComplete()
+        }
+
+        fun markBalanceUpdated() {
+            this.receivedBalanceUpdate = true
+            cleanIfComplete()
+        }
+    }
+
+    inner class ActiveBid(
+        val objectId: String,
+        val auctionId: String,
+        val interest: Double,
+        var currentBid: Long,
+        var receivedWinUpdate: Boolean = false,
+        var receivedBalanceUpdate: Boolean = false,
+        var receivedItemUpdate: Boolean = false,
+    ) {
+        fun markItemUpdated() {
+            this.receivedItemUpdate = true
+            cleanIfComplete()
+        }
+
+        fun markBalanceUpdated() {
+            this.receivedBalanceUpdate = true
+            cleanIfComplete()
+        }
+
+        fun markWinUpdated() {
+            this.receivedWinUpdate = true
+            cleanIfComplete()
+        }
+
+        fun cleanIfComplete() {
+            if (!receivedWinUpdate || !receivedBalanceUpdate || !receivedItemUpdate) {
+                return
+            }
+            bids.remove(this.auctionId)
+        }
+    }
 
     init {
         initializeOwnershipQuery()
@@ -74,35 +141,42 @@ class SimulatedParticipant(
     private fun auctionLoop() {
         spanFactory.createRootTrace { "[$email] auctionLoop" }.run {
             val feelingFactor = Math.random()
-
-            if (feelingFactor > 0.6) {
-                // We need to auction something!
-                val itemToAuction = currentItems.filterKeys { !currentAuctions.contains(it) }.values.randomOrNull()
-                if (itemToAuction != null) {
-                    logger.debug("[$email] Want to auction item $itemToAuction!")
-                    val minimumBid = if (balance < 0 && currentItems.count { !currentAuctions.contains(it.key) } == 1) {
-                        abs(balance)
-                    } else (200 + 200 * Math.random()).toLong()
-                    currentAuctions += itemToAuction.identifier
-
-                    commandGateway.send<String>(CreateAuction(itemToAuction.identifier, id, minimumBid))
-                        .thenAccept { auctionId ->
-                            logger.debug("[$email] Started auction for ${itemToAuction.identifier}! ID: $auctionId")
-                        }
-                        .exceptionally {
-                            logger.error("[$email] Exception while sending bid!", it)
-                            currentAuctions.remove(itemToAuction.identifier)
-                            return@exceptionally null
-                        }
-                }
-                lastPlacedAuction = Instant.now()
+            if (feelingFactor <= 0.6) {
+                return@run
             }
+            // I want to auction something!
+            pickItemToAuction()?.let { itemToAuction ->
+                logger.debug("[$email] Want to auction item $itemToAuction!")
+                val minimumBid = (200 + 200 * Math.random()).toLong()
 
-
-            this.auctionLoopSubscription = runTask(scheduler, (3000 + (Math.random() * 7000)).toLong()) {
-                auctionLoop()
+                val auctionState = ActiveAuction(
+                    objectId = itemToAuction.identifier,
+                    objectName = itemToAuction.name,
+                )
+                auctions[itemToAuction.identifier] = auctionState
+                commandGateway.send<String>(CreateAuction(itemToAuction.identifier, id, minimumBid))
+                    .thenAccept { auctionId ->
+                        auctionState.createdAt = Instant.now()
+                        auctionState.auctionId = auctionId
+                        logger.info("[$email] Started auction for ${itemToAuction.name}! AuctionId: $auctionId")
+                    }
+                    .exceptionally {
+                        logger.error("[$email] Exception while sending bid!", it)
+                        auctions.remove(itemToAuction.identifier)
+                        return@exceptionally null
+                    }
             }
         }
+
+        this.auctionLoopSubscription = runTask(scheduler, (3000 + (Math.random() * 7000)).toLong()) {
+            auctionLoop()
+        }
+    }
+
+    private fun pickItemToAuction(): ItemInPossession? {
+        return items
+            .filterKeys { objectId -> !auctions.containsKey(objectId) }
+            .values.randomOrNull()
     }
 
     private fun initializeActiveAuctionQuery() {
@@ -124,80 +198,96 @@ class SimulatedParticipant(
 
     }
 
-    private fun handleAuctionUpdate(it: ActiveAuctionItem) {
-        if (it.state == ActiveAuctionState.INACTIVE) {
+    private fun handleAuctionUpdate(update: ActiveAuctionItem) {
+        if (update.state == ActiveAuctionState.INACTIVE) {
             return
         }
-        if (it.state == ActiveAuctionState.REVERTED && currentAuctions.contains(it.identifier)) {
-            currentAuctions.remove(it.objectId)
-            return
-        }
-        if (it.state == ActiveAuctionState.ENDED) {
-            if (it.currentBidder == id) {
-                boughtPendingItems[it.identifier] = it.currentBid ?: 0
-            }
-            committedAuctionMoney.remove(it.identifier)
-            interestMap.remove(it.identifier)
-            if (it.currentBidder == null && currentAuctions.contains(it.objectId)) {
-                currentAuctions.remove(it.objectId)
+        if (update.state == ActiveAuctionState.REVERTED) {
+            if (auctions.remove(update.identifier) != null) {
+                logger.info("[$email] Received auction revert for auction ${update.identifier} of object ${update.objectId}")
             }
             return
         }
-        if (it.currentBidder == id) {
+        if (update.state == ActiveAuctionState.ENDED) {
+            if (update.currentBidder == null) {
+                // We didn't sell the item successfully. Remove from locks
+                auctions.remove(update.objectId)
+            }
+            if (update.currentBidder != id) {
+                // We didn't win the item. Remove any bids
+                bids.remove(update.identifier)
+            }
+            return
+        }
+        if (update.currentBidder == id) {
             // Woohoo, my bid got finalized. Don't need to do anything
+            bids[update.identifier]?.markWinUpdated()
             logger.debug(
                 "[$email] My bid of {} on auction {} got confirmed for item {}!",
-                it.currentBid,
-                it.identifier,
-                it.objectId
+                update.currentBid,
+                update.identifier,
+                update.objectId
             )
             return
         }
-
-        val interest = interestMap.computeIfAbsent(it.identifier) { Math.random() }
-
-        val currentPrice = (if (it.currentBid != null && ((it.currentBid ?: 0) > (it.minimumBid
-                ?: 0))
-        ) it.currentBid else it.minimumBid) ?: 0
-        val ownBid = committedAuctionMoney[it.identifier] ?: -1
-        if (ownBid > currentPrice) {
+        if (auctions.containsKey(update.objectId)) {
+            // My own auction, I won't bid
             return
         }
 
-        val bid = calculateBid(it, interest, currentPrice)
-        logger.debug("[$email] Want to bid $bid for current price $currentPrice on auction $it")
-        if (bid > currentPrice) {
-            committedAuctionMoney[it.identifier] = bid
+        val currentBidInfo = bids.computeIfAbsent(update.identifier) {
+            ActiveBid(
+                objectId = update.objectId,
+                auctionId = update.identifier,
+                interest = Math.random(),
+                currentBid = 0
+            )
+        }
+        if (currentBidInfo.interest < 0.3) {
+            return
+        }
+
+        val price: Long = when {
+            (update.currentBid ?: 0) > 0 -> update.currentBid ?: 0
+            else -> (update.minimumBid ?: 0)
+        }
+        if (currentBidInfo.currentBid > price) {
+            // This is an older update. There will come one a bit later with our bid!
+            return
+        }
+
+        val bid = calculateBid(update, currentBidInfo, price)
+        logger.debug("[$email] Want to bid $bid for current price $price on auction $update")
+        if (bid > price) {
+            currentBidInfo.currentBid = bid
             runTask(scheduler, (20 * 30 * Math.random()).toLong()) {
                 spanFactory.createRootTrace { "[$email] sendBid" }.run {
-                    logger.debug("[$email] Bidding $bid on auction $it")
-                    commandGateway.send<Boolean>(PlaceBidOnAuction(it.identifier, id, bid)).thenAccept { success ->
-                        if (!success) {
-                            committedAuctionMoney.remove(it.identifier)
-                        }
-                    }
+                    logger.debug("[$email] Bidding $bid on auction $update")
+                    commandGateway.send<Boolean>(PlaceBidOnAuction(update.identifier, id, bid))
                 }
             }
+        } else {
+            currentBidInfo.currentBid = 0
         }
     }
 
     private fun calculateBid(
         it: ActiveAuctionItem,
-        interest: Double,
-        currentPrice: Long
+        currentBid: ActiveBid,
+        price: Long
     ): Long {
-        val currentBidMoney = committedAuctionMoney.filterKeys { id -> id != it.objectId }.values.sum()
-        val currentPendingItemMoney = boughtPendingItems.values.sum()
-        val availableMoney = balance - currentBidMoney - currentPendingItemMoney
-        if(availableMoney < 0) {
+        val interest = currentBid.interest
+        val currentBidMoney = bids.filterValues { bid -> bid.auctionId != it.identifier }.values.sumOf { it.currentBid }
+        val availableMoney = balance - currentBidMoney
+        if (availableMoney < 0) {
             return -1
         }
 
 
         val maxToSpend = interest * availableMoney
-        val availableForBid = maxToSpend - currentPrice
-        val actualValueForBid = availableForBid * interest * Math.random()
-        return currentPrice + actualValueForBid.toLong()
+        val availableForBid = maxToSpend - price
+        val actualValueForBid = availableForBid * interest * biddingFactor * 0.5
+        return price + actualValueForBid.toLong()
     }
 
     private fun initializeOwnershipQuery() {
@@ -213,7 +303,7 @@ class SimulatedParticipant(
                     logger.error("[$email] Error in GetAuctionObjects", it)
                     runTask(scheduler, 500) { initializeOwnershipQuery() }
                 }.subscribe {
-                    it.items.filter { l -> l.owner == id }
+                    it.items
                         .forEach { l -> handleOwnershipItem(l) }
                 }
             this.ownershipSubscription = query.updates()
@@ -228,14 +318,17 @@ class SimulatedParticipant(
     }
 
     private fun handleOwnershipItem(item: AuctionOwnershipInfoItem) {
-        if (item.owner == id && !currentItems.containsKey(item.identifier)) {
-            logger.debug("[$email] Received item ${item.identifier}")
-            currentItems[item.identifier] = item
+        itemNames[item.identifier] = item.name
+        if (item.owner == id && !items.containsKey(item.identifier)) {
+            logger.info("[$email] Received item ${item.identifier}")
+            val bid = bids.values.firstOrNull { it.objectId == item.identifier }
+            items[item.identifier] = ItemInPossession(item.identifier, item.name, bid?.currentBid ?: 0)
+            bid?.markItemUpdated()
         }
-        if (currentItems.containsKey(item.identifier) && item.owner != id) {
-            logger.debug("[$email] Sold item ${item.identifier}")
-            currentItems.remove(item.identifier)
-            currentAuctions.remove(item.identifier)
+        if (items.containsKey(item.identifier) && item.owner != id) {
+            logger.info("[$email] Gave item ${item.identifier} to ${item.owner}")
+            items.remove(item.identifier)
+            auctions[item.identifier]?.markItemUpdated()
         }
     }
 
@@ -262,7 +355,12 @@ class SimulatedParticipant(
                 .subscribe {
                     balance = it.newBalance
                     logger.debug("[$email] balance was updated for ${it.reference}")
-                    boughtPendingItems.remove(it.reference)
+                    if (it.update > 0) {
+                        auctions.values.firstOrNull { a -> a.auctionId == it.reference }?.markBalanceUpdated()
+
+                    } else {
+                        bids[it.reference]?.markBalanceUpdated()
+                    }
                 }
         }
     }
@@ -280,12 +378,28 @@ class SimulatedParticipant(
             terminated,
             email,
             balance,
-            committedAuctionMoney,
-            currentItems.map {
+            bids.filterValues { it.currentBid > 0 }.map { (_, value) ->
+                ActiveBidDto(
+                    auctionId = value.auctionId,
+                    objectId = value.objectId,
+                    objectName = itemNames[value.objectId] ?: "Unknown",
+                    bid = value.currentBid,
+                    interest = value.interest,
+                    receivedWinUpdate = value.receivedWinUpdate,
+                    receivedBalanceUpdate = value.receivedBalanceUpdate,
+                    receivedItemUpdate = value.receivedItemUpdate
+                )
+            },
+            items.map {
+                val auction = auctions[it.key]
                 ParticipantItem(
                     it.value.identifier,
                     it.value.name,
-                    currentAuctions.contains(it.key)
+                    it.value.boughtFor,
+                    auction != null,
+                    auction?.createdAt,
+                    auction?.receivedBalanceUpdate,
+                    auction?.receivedItemUpdate,
                 )
             }
         )

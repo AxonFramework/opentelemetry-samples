@@ -46,27 +46,13 @@ class SimulatedParticipantOrchestrator(
         return SimulatedParticipantDtoResponse(simulatedParticipants.map { it.toDto() })
     }
 
-    @Scheduled(fixedRate = 500)
+    @Scheduled(fixedRate = 200)
     fun sendUpdate() {
         queryUpdateEmitter.emit(
             GetSimulatedParticipants::class.java,
             { true },
             handle(GetSimulatedParticipants())
         )
-    }
-
-    @Scheduled(fixedRate = 60000, initialDelay = 120000)
-    fun killLowestPartcipant() {
-        simulatedParticipants.minBy { it.toDto(false).balance }.let {
-            it.terminate()
-            simulatedParticipants.remove(it)
-
-            queryUpdateEmitter.emit(
-                GetSimulatedParticipants::class.java,
-                { true },
-                SimulatedParticipantDtoResponse(participants = listOf(it.toDto(true)))
-            )
-        }
     }
 
     @Scheduled(fixedDelay = 1000, initialDelay = 10000)

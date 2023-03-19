@@ -18,6 +18,7 @@ package io.axoniq.demo.tracing.objectregistry
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect
 import io.axoniq.demo.tracing.auction.AuctionEnded
+import io.axoniq.demo.tracing.auction.RevertAuction
 import io.axoniq.demo.tracing.objectsregistry.TransferAuctionObject
 import io.axoniq.demo.tracing.participants.BalanceAddedToParticipant
 import io.axoniq.demo.tracing.participants.BalanceDeducted
@@ -54,6 +55,10 @@ class TransferOfOwnershipSaga {
         objectId = event.objectId
         // We need to transfer from original owner to new one
         commandGateway.send<Void>(DeductBalance(buyer, event.auctionId, amount))
+            .exceptionally {
+                commandGateway.send<Void>(RevertAuction(auctionId = event.auctionId, reason = "Buyer didn't have the money!"))
+                    .get()
+            }
     }
 
     @SagaEventHandler(associationProperty = "reference", keyName = "auctionId")

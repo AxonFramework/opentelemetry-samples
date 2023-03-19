@@ -16,10 +16,7 @@
 
 package io.axoniq.demo.tracing.objectregistry
 
-import io.axoniq.demo.tracing.objectsregistry.AuctionObjectOwnerTransferred
-import io.axoniq.demo.tracing.objectsregistry.AuctionObjectSubmitted
-import io.axoniq.demo.tracing.objectsregistry.AuctionOwnershipInfoItem
-import io.axoniq.demo.tracing.objectsregistry.GetAuctionObjects
+import io.axoniq.demo.tracing.objectsregistry.*
 import org.axonframework.config.ProcessingGroup
 import org.axonframework.eventhandling.EventHandler
 import org.axonframework.queryhandling.QueryHandler
@@ -35,7 +32,7 @@ class AuctionObjectProjection(
     @EventHandler
     fun on(event: AuctionObjectSubmitted) {
         val obj = repository.save(
-            AuctionObjectInformation(event.id, event.name, event.owner)
+            AuctionObjectInformation(event.id, event.name, event.owner, event.auctionHouseId)
         )
         queryUpdateEmitter.emit(GetAuctionObjects::class.java, { true }, obj.toDto())
     }
@@ -44,12 +41,12 @@ class AuctionObjectProjection(
     fun on(event: AuctionObjectOwnerTransferred) {
         val obj = repository.findById(event.id).orElseThrow()
         obj.owner = event.newOwner
-        queryUpdateEmitter.emit(GetAuctionObjects::class.java, { true }, obj.toDto())
+        queryUpdateEmitter.emit(GetAuctionObjects::class.java, { it.auctionHouseId == obj.auctionHouseId }, obj.toDto())
     }
 
     @QueryHandler
-    fun on(query: GetAuctionObjects): List<AuctionOwnershipInfoItem> {
-        return repository.findAll().map { it.toDto() }
+    fun on(query: GetAuctionObjects): AuctionOwnershipResponse {
+        return AuctionOwnershipResponse(repository.findAllByAuctionHouseId(query.auctionHouseId).map { it.toDto() })
     }
 
     fun AuctionObjectInformation.toDto() = AuctionOwnershipInfoItem(identifier, name, owner)

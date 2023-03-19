@@ -74,9 +74,9 @@ class ParticipantAggregate {
 
     @CommandHandler
     fun on(command: DeductBalance) {
-        if (command.amount > balance) {
-            throw IllegalStateException("Not a high enough balance! Current: $balance, needed: ${command.amount}")
-        }
+//        if (command.amount > balance) {
+//            throw IllegalStateException("Not a high enough balance! Current: $balance, needed: ${command.amount}")
+//        }
         apply(BalanceDeducted(id, command.reference, command.amount, balance - command.amount))
     }
 

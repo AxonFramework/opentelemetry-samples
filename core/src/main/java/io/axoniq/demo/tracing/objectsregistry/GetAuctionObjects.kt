@@ -16,4 +16,4 @@
 
 package io.axoniq.demo.tracing.objectsregistry
 
-class GetAuctionObjects
+data class GetAuctionObjects(val auctionHouseId: String)

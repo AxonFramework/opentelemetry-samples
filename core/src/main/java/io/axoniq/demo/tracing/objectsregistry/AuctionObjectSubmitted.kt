@@ -20,4 +20,5 @@ data class AuctionObjectSubmitted(
     val id: String,
     val name: String,
     val owner: String,
+    val auctionHouseId: String,
 )

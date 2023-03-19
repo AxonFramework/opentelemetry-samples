@@ -26,7 +26,6 @@ import org.axonframework.modelling.command.AggregateLifecycle
 import org.axonframework.spring.stereotype.Aggregate
 import org.springframework.beans.factory.annotation.Autowired
 import java.time.Instant
-import io.axoniq.demo.tracing.auction.*
 
 @Aggregate
 class Auction {
@@ -41,12 +40,12 @@ class Auction {
         get() = bids.maxByOrNull { it.amount }
 
     enum class State {
-        CREATED, STARTED, ENDED
+        CREATED, STARTED, ENDED, REVERTED
     }
 
     @CommandHandler
     constructor(command: CreateAuction, @Autowired deadlineManager: DeadlineManager) {
-        val endTime = Instant.now().plusSeconds(30)
+        val endTime = Instant.now().plusSeconds(10)
         AggregateLifecycle.apply(
             AuctionCreated(
                 IdentifierFactory.getInstance().generateIdentifier(),
@@ -60,13 +59,21 @@ class Auction {
     }
 
     @CommandHandler
-    fun on(command: PlaceBidOnAuction) {
+    fun on(command: PlaceBidOnAuction): Boolean {
+        if (state != State.STARTED) {
+            return false
+        }
         val highest = winningBid?.amount ?: minimalBid
         if (highest >= command.price) {
-//            AggregateLifecycle.apply(BidRejectedOnAuction(id, command.participantId, command.price))
-            return
+            return false
         }
         AggregateLifecycle.apply(BidPlacedOnAuction(id, command.participantId, command.price))
+        return true
+    }
+
+    @CommandHandler
+    fun on(command: RevertAuction) {
+        AggregateLifecycle.apply(AuctionReverted(id, objectId, owner, command.reason))
     }
 
     @DeadlineHandler(deadlineName = "closeAuction")
@@ -96,6 +103,11 @@ class Auction {
     @EventSourcingHandler
     fun on(event: AuctionEnded) {
         this.state = State.ENDED
+    }
+
+    @EventSourcingHandler
+    fun on(event: AuctionReverted) {
+        this.state = State.REVERTED
     }
 
     @EventSourcingHandler

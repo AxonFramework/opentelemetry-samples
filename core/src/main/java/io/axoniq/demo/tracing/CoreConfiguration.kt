@@ -46,7 +46,6 @@ class CoreConfiguration {
     @Bean
     @Primary
     fun serializer(): Serializer = JacksonSerializer.builder()
-        .defaultTyping()
         .lenientDeserialization()
         .objectMapper(ObjectMapper().findAndRegisterModules())
         .build()

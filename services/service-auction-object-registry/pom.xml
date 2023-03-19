@@ -10,5 +10,5 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
     <artifactId>service-auction-object-registry</artifactId>
-    <name>Auction Command service</name>
+    <name>Auction Object Registry service</name>
 </project>

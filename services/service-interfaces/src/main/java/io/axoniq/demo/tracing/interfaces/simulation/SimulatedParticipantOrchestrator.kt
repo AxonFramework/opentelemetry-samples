@@ -14,52 +14,63 @@
  * limitations under the License.
  */
 
-package io.axoniq.demo.tracing.interfaces
+package io.axoniq.demo.tracing.interfaces.simulation
 
+import com.github.javafaker.Faker
 import io.axoniq.demo.tracing.objectsregistry.SubmitAuctionObject
 import io.axoniq.demo.tracing.participants.RegisterParticipant
 import org.axonframework.commandhandling.gateway.CommandGateway
 import org.axonframework.common.IdentifierFactory
 import org.axonframework.queryhandling.QueryGateway
+import org.axonframework.queryhandling.QueryHandler
+import org.axonframework.queryhandling.QueryUpdateEmitter
 import org.axonframework.tracing.SpanFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import java.util.concurrent.atomic.AtomicInteger
 
 @Service
 class SimulatedParticipantOrchestrator(
     private val queryGateway: QueryGateway,
     private val commandGateway: CommandGateway,
-    private val spanFactory: SpanFactory
+    private val spanFactory: SpanFactory,
+    private val queryUpdateEmitter: QueryUpdateEmitter
 ) {
-    private val emailSuffix = IdentifierFactory.getInstance().generateIdentifier().split("-")[0]
-    private var desiredCount = 20
-    private val indexInteger = AtomicInteger()
-    private val objectInteger = AtomicInteger()
+    val auctionHouseId = IdentifierFactory.getInstance().generateIdentifier()
+    private val faker = Faker()
 
     private val simulatedParticipants = mutableListOf<SimulatedParticipant>()
+    var desiredCount = 20
 
-    fun setDesiredCount(count: Int) {
-        desiredCount = count
+    @QueryHandler
+    fun handle(query: GetSimulatedParticipants): SimulatedParticipantDtoResponse {
+        return SimulatedParticipantDtoResponse(simulatedParticipants.map { it.toDto() })
     }
 
-    fun getDesiredCount() = desiredCount
+    @Scheduled(fixedRate = 500)
+    fun sendUpdate() {
+        queryUpdateEmitter.emit(
+            GetSimulatedParticipants::class.java,
+            { true },
+            handle(GetSimulatedParticipants())
+        )
+    }
 
     @Scheduled(fixedDelay = 1000, initialDelay = 10000)
     fun setup() {
         while (simulatedParticipants.size < desiredCount) {
-            val index = indexInteger.incrementAndGet()
-            val id = commandGateway.sendAndWait<String>(RegisterParticipant("$emailSuffix-$index@axoniq-auction.io"))
-            1.rangeTo(5).forEach {_ ->
-                val itemId = objectInteger.incrementAndGet()
-                commandGateway.sendAndWait<String>(SubmitAuctionObject("Auction Object $itemId", id))
+            val email = "${faker.name().firstName()}@${auctionHouseId}.io"
+            val id = commandGateway.sendAndWait<String>(RegisterParticipant(email))
+            1.rangeTo(3).forEach { _ ->
+                val name = getNewName()
+                commandGateway.sendAndWait<String>(SubmitAuctionObject(name, id, auctionHouseId))
             }
             simulatedParticipants += SimulatedParticipant(
                 id = id,
-                email = "$emailSuffix-$index@axoniq-auction.io",
+                email = email,
                 queryGateway = queryGateway,
                 commandGateway = commandGateway,
-                spanFactory = spanFactory
+                spanFactory = spanFactory,
+                auctionHouseId = auctionHouseId,
             )
         }
 
@@ -68,6 +79,22 @@ class SimulatedParticipantOrchestrator(
             val participantToTerminate = simulatedParticipants.random()
             simulatedParticipants.remove(participantToTerminate)
             participantToTerminate.terminate()
+
+            queryUpdateEmitter.emit(
+                GetSimulatedParticipants::class.java,
+                { true },
+                SimulatedParticipantDtoResponse(participants = listOf(participantToTerminate.toDto(true)))
+            )
         }
+    }
+
+    private val generatedNames = mutableListOf<String>()
+    fun getNewName(): String {
+        val name = faker.commerce().productName()
+        if (generatedNames.contains(name)) {
+            return getNewName()
+        }
+        generatedNames.add(name)
+        return name
     }
 }

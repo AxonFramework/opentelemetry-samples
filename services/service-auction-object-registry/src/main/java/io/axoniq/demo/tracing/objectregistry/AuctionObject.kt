@@ -39,7 +39,8 @@ class AuctionObject {
             AuctionObjectSubmitted(
                 IdentifierFactory.getInstance().generateIdentifier(),
                 command.name,
-                command.initialOwner
+                command.initialOwner,
+                command.auctionHouseId,
             )
         )
     }

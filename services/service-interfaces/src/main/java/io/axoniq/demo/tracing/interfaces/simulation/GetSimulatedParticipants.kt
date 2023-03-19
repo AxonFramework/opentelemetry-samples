@@ -14,12 +14,7 @@
  * limitations under the License.
  */
 
-package io.axoniq.demo.tracing.objectregistry
+package io.axoniq.demo.tracing.interfaces.simulation
 
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.stereotype.Repository
-
-@Repository
-interface AuctionObjectInfoRepository : JpaRepository<AuctionObjectInformation, String> {
-    fun findAllByAuctionHouseId(id: String): List<AuctionObjectInformation>
+class GetSimulatedParticipants {
 }

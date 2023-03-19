@@ -47,7 +47,7 @@ class ParticipantProjection(
 
     @EventHandler
     fun on(event: BalanceAddedToParticipant) {
-        val existing = repository.findById(event.id).orElseThrow()
+        val existing = repository.findByIdOrNull(event.id) ?: return
         existing.balance = event.newBalance
 
         queryUpdateEmitter.emit(GetBalanceForParticipant::class.java, { it.email == existing.email }, event.newBalance)
@@ -56,7 +56,7 @@ class ParticipantProjection(
 
     @EventHandler
     fun on(event: BalanceDeducted) {
-        val existing = repository.findById(event.id).orElseThrow()
+        val existing = repository.findByIdOrNull(event.id) ?: return
         existing.balance = event.newBalance
 
         queryUpdateEmitter.emit(GetBalanceForParticipant::class.java, { it.email == existing.email }, event.newBalance)

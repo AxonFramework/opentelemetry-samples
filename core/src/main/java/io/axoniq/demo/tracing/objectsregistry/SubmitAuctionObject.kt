@@ -19,4 +19,5 @@ package io.axoniq.demo.tracing.objectsregistry
 data class SubmitAuctionObject(
     val name: String,
     val initialOwner: String,
+    val auctionHouseId: String,
 )

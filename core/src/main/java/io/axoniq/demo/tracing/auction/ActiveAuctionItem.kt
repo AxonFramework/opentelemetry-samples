@@ -27,3 +27,7 @@ data class ActiveAuctionItem(
     var currentBidder: String?,
     var endTime: Instant?,
 )
+
+data class ActiveAuctionsResponse(
+    val auctions: List<ActiveAuctionItem>
+)

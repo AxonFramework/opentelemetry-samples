@@ -10,4 +10,5 @@ data class AuctionObjectInformation(
     val identifier: String,
     var name: String,
     var owner: String,
+    val auctionHouseId: String,
 )

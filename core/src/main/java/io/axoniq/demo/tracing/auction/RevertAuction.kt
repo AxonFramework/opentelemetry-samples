@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package io.axoniq.demo.tracing.objectregistry
+package io.axoniq.demo.tracing.auction
 
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.stereotype.Repository
+import org.axonframework.modelling.command.TargetAggregateIdentifier
+import java.time.Instant
 
-@Repository
-interface AuctionObjectInfoRepository : JpaRepository<AuctionObjectInformation, String> {
-    fun findAllByAuctionHouseId(id: String): List<AuctionObjectInformation>
-}
+data class RevertAuction(
+    @TargetAggregateIdentifier val auctionId: String,
+    val reason: String,
+)

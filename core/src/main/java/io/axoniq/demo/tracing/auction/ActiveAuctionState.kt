@@ -19,5 +19,6 @@ package io.axoniq.demo.tracing.auction
 enum class ActiveAuctionState {
     INACTIVE,
     STARTED,
-    ENDED
+    ENDED,
+    REVERTED,
 }

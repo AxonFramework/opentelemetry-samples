@@ -53,6 +53,13 @@ class AuctionProjection(
     }
 
     @EventHandler
+    fun on(event: AuctionReverted) {
+        val auction = repository.findById(event.auctionId).orElseThrow()
+        auction.state = ActiveAuctionState.REVERTED
+        queryUpdateEmitter.emit(GetActiveAuctions::class.java, { true }, auction.toDto())
+    }
+
+    @EventHandler
     fun on(event: BidPlacedOnAuction) {
         val auction = repository.findById(event.auctionId).orElseThrow()
         auction.currentBid = event.price
@@ -61,8 +68,8 @@ class AuctionProjection(
     }
 
     @QueryHandler
-    fun on(query: GetActiveAuctions): List<ActiveAuctionItem> {
-        return repository.findAllByState(ActiveAuctionState.STARTED).map { it.toDto() }
+    fun on(query: GetActiveAuctions): ActiveAuctionsResponse {
+        return ActiveAuctionsResponse(repository.findAllByState(ActiveAuctionState.STARTED).map { it.toDto() })
     }
 
     fun AuctionInformation.toDto() =

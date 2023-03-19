@@ -14,12 +14,24 @@
  * limitations under the License.
  */
 
-package io.axoniq.demo.tracing.objectregistry
+package io.axoniq.demo.tracing.interfaces.simulation
 
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.stereotype.Repository
+data class SimulatedParticipantDto(
+    val id: String,
+    val terminated: Boolean,
+    val email: String,
+    val balance: Long,
+    val activeBids: Map<String, Long>,
+    val items: List<ParticipantItem>,
+)
 
-@Repository
-interface AuctionObjectInfoRepository : JpaRepository<AuctionObjectInformation, String> {
-    fun findAllByAuctionHouseId(id: String): List<AuctionObjectInformation>
-}
+
+data class SimulatedParticipantDtoResponse(
+    val participants: List<SimulatedParticipantDto>
+)
+
+data class ParticipantItem(
+    val id: String,
+    val name: String,
+    val auctioning: Boolean,
+)

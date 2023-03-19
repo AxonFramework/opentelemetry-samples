@@ -1,7 +1,7 @@
 <script setup lang="ts">
 
 
-import {computed, onUnmounted, ref} from "vue";
+import {computed, onUnmounted, reactive, ref} from "vue";
 
 interface ActiveAuction {
   identifier: string;
@@ -15,9 +15,11 @@ interface ActiveAuction {
 
 interface Participant {
   id: string
+  terminated: boolean
   email: string
-  state: string
   balance: number
+  activeBids: { [auctionId: string]: number },
+  items: ParticipantItem[]
 }
 
 interface ObjectItem {
@@ -26,10 +28,17 @@ interface ObjectItem {
   owner: string,
 }
 
-const auctions = ref<{ [id: string]: ActiveAuction }>({})
-const participants = ref<{ [id: string]: Participant }>({})
-const ownerships = ref<{ [id: string]: ObjectItem }>({})
-const events = ref<string[]>([])
+
+interface ParticipantItem {
+  id: string
+  name: string
+  auctioning: boolean,
+}
+
+let auctions = reactive<{ [id: string]: ActiveAuction }>({})
+let participants = reactive<{ [id: string]: Participant }>({})
+let ownerships = reactive<{ [id: string]: ObjectItem }>({})
+const events = ref<Event[]>([])
 const auctionError = ref<boolean>(false)
 const participantError = ref<boolean>(false)
 const ownershipError = ref<boolean>(false)
@@ -37,8 +46,9 @@ const ownershipError = ref<boolean>(false)
 const participantAmount = ref(0)
 
 let participantAmountInFlight = false;
+
 function fetchAmountOfparticipants() {
-  if(participantAmountInFlight) {
+  if (participantAmountInFlight) {
     return
   }
   participantAmountInFlight = true;
@@ -57,21 +67,35 @@ function updateParticipantAmount(amount: number) {
   })
 }
 
+interface Event {
+  index: number
+  objectName: string
+  auctionId: string
+  type: string
+  value: string
+}
+
 const inerval = setInterval(() => {
   fetchAmountOfparticipants();
 }, 2000)
 onUnmounted(() => clearInterval(inerval))
 fetchAmountOfparticipants();
 
-function addEvent(content: string) {
-  events.value = [content, ...events.value.splice(0, 30)]
+let index = 0;
+
+function addEvent(content: Omit<Event, 'index'>) {
+  index++
+  events.value = [{...content, index}, ...events.value.splice(0, 20)]
 }
 
 let auctionSource: EventSource | null = null;
+
 function openAuctionSource() {
   auctionSource = new EventSource(`/api/auctions`)
   auctionSource.onopen = () => {
-    auctions.value = {}
+    Object.keys(auctions).forEach(key => {
+      delete auctions [key]
+    })
     auctionError.value = false
   }
   auctionSource.onerror = () => {
@@ -82,18 +106,33 @@ function openAuctionSource() {
 
   auctionSource.onmessage = (ev) => {
     const data = JSON.parse(ev.data) as ActiveAuction;
+    const objectName = ownerships[data.objectId]?.name || data.objectId;
+    const bidder = data.currentBidder ? toName(participants[data.currentBidder]?.email || data.currentBidder) : null;
     if (data.state === "ENDED") {
-      addEvent(`Auction with id ${data.identifier} ended. Item goes to ${participants.value[data.currentBidder]?.email || data.currentBidder}`)
-      const copy = {...auctions.value}
-      delete copy[data.identifier]
-      auctions.value = copy
+      addEvent({
+        auctionId: data.identifier,
+        objectName: objectName,
+        type: 'Auction won',
+        value: bidder || 'No one'
+      })
+      delete auctions[data.identifier]
     } else {
       if (data.currentBidder) {
-        addEvent(`Auction with id ${data.identifier} got new bid of ${data.currentBid}.`)
+        addEvent({
+          auctionId: data.identifier,
+          objectName: objectName,
+          type: 'New bid',
+          value: `${data.currentBid} by ${bidder || 'Unknown'}`
+        })
       } else {
-        addEvent(`Auction with id ${data.identifier} created with minimum bid of ${data.minimumBid}.`)
+        addEvent({
+          auctionId: data.identifier,
+          objectName: objectName,
+          type: 'New Auction',
+          value: ''
+        })
       }
-      auctions.value = {...auctions.value, [data.identifier]: data}
+      auctions[data.identifier] = data
     }
   }
 }
@@ -106,7 +145,9 @@ let participantSource: EventSource | null = null;
 function openParticipantSource() {
   participantSource = new EventSource(`/api/participants`)
   participantSource.onopen = () => {
-    participants.value = {}
+    Object.keys(participants).forEach(key => {
+      delete participants [key]
+    })
     participantError.value = false
   }
   participantSource.onerror = () => {
@@ -117,7 +158,11 @@ function openParticipantSource() {
 
   participantSource.onmessage = (ev) => {
     const data = JSON.parse(ev.data) as Participant;
-    participants.value = {...participants.value, [data.id]: data}
+    if(data.terminated) {
+      delete participants[data.id]
+    } else {
+      participants[data.id] = data
+    }
   }
 }
 
@@ -125,10 +170,13 @@ openParticipantSource()
 
 
 let ownershipSource: EventSource | null = null;
+
 function openOwnershipSource() {
   ownershipSource = new EventSource(`/api/ownership`)
   ownershipSource.onopen = () => {
-    ownerships.value = {}
+    Object.keys(ownerships).forEach(key => {
+      delete ownerships [key]
+    })
     ownershipError.value = false
   }
   ownershipSource.onerror = (e) => {
@@ -139,7 +187,7 @@ function openOwnershipSource() {
 
   ownershipSource.onmessage = (ev) => {
     const data = JSON.parse(ev.data) as ObjectItem;
-    ownerships.value = {...ownerships.value, [data.identifier]: data}
+    ownerships[data.identifier] = data
   }
 }
 
@@ -147,8 +195,30 @@ openOwnershipSource()
 
 
 const auctionsSortedById = computed(() => {
-  return Object.values(auctions.value).sort((a: any, b: any) => a.identifier.localeCompare(b.identifier))
+  return Object.values(auctions).sort((a, b) => new Date(a.endTime).getTime() - new Date(b.endTime).getTime())
 })
+
+const participantPage = ref(0)
+const participantPages = computed(() => {
+  const values = Object.values(participants).sort((a, b) => b.balance - a.balance)
+  const pages = []
+  for (let i = 0; i < values.length / 10; i++) {
+    pages.push(values.slice(10 * i, 10 * (i + 1)))
+  }
+  return pages
+})
+
+const formatTime = (date: string) => {
+  let time = new Date(date);
+  return time.getHours().toString().padStart(2, "0") + ":" + time.getMinutes().toString().padStart(2, "0") + ":" + time.getSeconds().toString().padStart(2, "0")
+}
+
+const toName = (email: string) => {
+  if(!email || !email.length) {
+    return 'Unknown'
+  }
+  return email.split("@")[0]
+}
 </script>
 
 <template>
@@ -173,17 +243,74 @@ const auctionsSortedById = computed(() => {
           <h1>Configuration</h1>
           <p>Number of partcipants: {{ participantAmount }}</p>
           <div>
-            <button type="button" class="btn btn-secondary mx-2" @click.prevent.stop="() => updateParticipantAmount(participantAmount + 1)">Add participant</button>
-            <button type="button" class="btn btn-secondary mx-2" @click.prevent.stop="() => updateParticipantAmount(participantAmount - 1)">Remove participant</button>
+            <button type="button" class="btn btn-secondary mx-2"
+                    @click.prevent.stop="() => updateParticipantAmount(participantAmount + 1)">Add participant
+            </button>
+            <button type="button" class="btn btn-secondary mx-2"
+                    @click.prevent.stop="() => updateParticipantAmount(participantAmount - 1)">Remove participant
+            </button>
           </div>
         </div>
-        <div class="col-md-8">
-          <h1>Auctions</h1>
+        <div class="col-md-4">
+          <div class="d-flex">
+            <h1>Participants ({{Object.keys(participants).length}})</h1>
+            <div class="flex-grow-1"></div>
+            <nav class="mx-2">
+              <ul class="pagination">
+                <li :class="`page-item ${pageNum === participantPage ? 'active' : ''}`" v-for="(page, pageNum) of participantPages">
+                  <a class="page-link" href="#" @click.prevent.stop="participantPage = pageNum">{{pageNum + 1}}</a>
+                </li>
+              </ul>
+            </nav>
+
+          </div>
           <table class="table table-responsive">
             <thead>
             <tr>
-              <th>Auction id</th>
-              <th>Object</th>
+              <th>Name</th>
+              <th>Money</th>
+              <th>Items</th>
+              <th>Bids</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="row in participantPages[participantPage]"
+                :key="row.id">
+              <td>{{ toName(row.email) }}</td>
+              <td>{{ row.balance }}</td>
+              <td>
+                <div v-for="item in row.items" :key="item.id">
+                  <div v-if="item.auctioning" style="color: #ff4b01">
+                    {{ item.name }}
+                  </div>
+                  <div v-else>
+                    {{ item.name }}
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div class="d-flex" style="width: 200px">
+                  <div class="flex-grow-1">
+                    <div v-for="(bid, item) of row.activeBids" :key="item">{{
+                        ownerships[auctions[item]?.objectId]?.name
+                      }}
+                    </div>
+                  </div>
+                  <div style="text-align: right">
+                    <div v-for="(bid, item) of row.activeBids" style="margin-left: 10px" :key="item">{{ bid }}</div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="col-md-4">
+          <h1>Auctions ({{Object.keys(auctions).length}})</h1>
+          <table class="table table-responsive">
+            <thead>
+            <tr>
+              <th>Item</th>
               <th>Minimal bid</th>
               <th>Current bid</th>
               <th>By</th>
@@ -191,58 +318,37 @@ const auctionsSortedById = computed(() => {
             </tr>
             </thead>
             <tbody>
-            <tr v-for="row in auctionsSortedById">
-              <td>{{ row.identifier }}</td>
-              <td>{{ownerships[row.objectId].name }}</td>
+            <tr v-for="row in auctionsSortedById" :key="row.identifier">
+              <td>{{ ownerships[row.objectId].name }}</td>
               <td>{{ row.minimumBid }}</td>
-              <td>{{ row.currentBid }}</td>
-              <td>{{ participants[row.currentBidder]?.email || row.currentBidder }}</td>
-              <td>{{ row.endTime }}</td>
+              <td>{{ row.currentBid || '-' }}</td>
+              <td>{{ toName(participants[row.currentBidder]?.email || row.currentBidder) }}</td>
+              <td>{{ formatTime(row.endTime) }}</td>
             </tr>
             </tbody>
           </table>
 
-          <h1>Participants</h1>
-          <table class="table table-responsive">
-            <thead>
-            <tr>
-              <th>ID</th>
-              <th>Email</th>
-              <th>Balance</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr v-for="row in participants">
-              <td>{{ row.id }}</td>
-              <td>{{ row.email }}</td>
-              <td>{{ row.balance }}</td>
-            </tr>
-            </tbody>
-          </table>
-
-          <h1>Ownerships</h1>
-          <table class="table table-responsive">
-            <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Owner</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr v-for="row in ownerships">
-              <td>{{ row.identifier }}</td>
-              <td>{{ row.name }}</td>
-              <td>{{ participants[row.owner]?.email || row.owner }}</td>
-            </tr>
-            </tbody>
-          </table>
         </div>
         <div class="col-md-4">
-          <h1>Last 100 events</h1>
-          <div v-for="event in events">
-            {{ event }}
-          </div>
+          <h1>Last 20 events</h1>
+          <table class="table table-responsive">
+            <thead>
+            <tr>
+              <th>Index</th>
+              <th>Object</th>
+              <th>Event</th>
+              <th>Details</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="event in events" :key="event.index">
+              <td>{{ event.index }}</td>
+              <td>{{ event.objectName }}</td>
+              <td>{{ event.type }}</td>
+              <td>{{ event.value }}</td>
+            </tr>
+            </tbody>
+          </table>
         </div>
 
       </div>

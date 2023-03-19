@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Flux
 import reactor.core.scheduler.Schedulers
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 @RestController
 @RequestMapping("api")
@@ -63,6 +64,7 @@ class FrontendController(
             .doOnTerminate {
                 subscriptionQuery.close()
             }
+            .buffer(Duration.ofMillis(200))
             .asServerSentEvents()
             .withHeartbeat()
 
@@ -80,8 +82,8 @@ class FrontendController(
         return subscriptionQuery
             .initialResult()
             .publishOn(Schedulers.boundedElastic())
-            .flatMapIterable { it.participants }
-            .concatWith(subscriptionQuery.updates().flatMapIterable { it.participants })
+            .map { it.participants }
+            .concatWith(subscriptionQuery.updates().map { it.participants })
             .doOnTerminate {
                 subscriptionQuery.close()
             }
@@ -106,6 +108,7 @@ class FrontendController(
             .doOnTerminate {
                 query.close()
             }
+            .buffer(Duration.ofMillis(200))
             .asServerSentEvents()
             .withHeartbeat()
 

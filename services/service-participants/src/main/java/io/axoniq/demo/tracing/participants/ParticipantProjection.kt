@@ -50,7 +50,11 @@ class ParticipantProjection(
         val existing = repository.findByIdOrNull(event.id) ?: return
         existing.balance = event.newBalance
 
-        queryUpdateEmitter.emit(GetBalanceForParticipant::class.java, { it.email == existing.email }, event.newBalance)
+        queryUpdateEmitter.emit(
+            GetBalanceForParticipant::class.java,
+            { it.email == existing.email },
+            ParticipantBalanceUpdate(event.amount, event.newBalance, event.reference)
+        )
         queryUpdateEmitter.emit(GetAllParticipantsForSubscriptionQuery::class.java, { true }, participantDto(existing))
     }
 
@@ -59,7 +63,10 @@ class ParticipantProjection(
         val existing = repository.findByIdOrNull(event.id) ?: return
         existing.balance = event.newBalance
 
-        queryUpdateEmitter.emit(GetBalanceForParticipant::class.java, { it.email == existing.email }, event.newBalance)
+        queryUpdateEmitter.emit(
+            GetBalanceForParticipant::class.java, { it.email == existing.email },
+            ParticipantBalanceUpdate(-1 * event.amount, event.newBalance, event.reference)
+        )
         queryUpdateEmitter.emit(GetAllParticipantsForSubscriptionQuery::class.java, { true }, participantDto(existing))
     }
 

@@ -35,7 +35,7 @@ class AuctionProjection(
             AuctionInformation(
                 event.auctionId,
                 event.objectId,
-                ActiveAuctionState.INACTIVE,
+                ActiveAuctionState.STARTED,
                 event.minimumPrice,
                 0,
                 null,

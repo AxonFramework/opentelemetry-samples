@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
+import reactor.core.scheduler.Schedulers
 
 /**
  * Registers participants with different emails, sometimes clashing the email and closing the account.
@@ -53,10 +54,10 @@ class EmailUniquenessDemoSimulator(
                 logger.info("{} registering @gmail.com a second time, which should fail", completeName)
             }
 
-            runTask(200) {
+            runTask(Schedulers.boundedElastic(), 200) {
                 logger.info("{} changing mail to @axoniq.io", completeName)
                 commandGateway.send<Void>(ChangeParticipantEmail(id, "$completeName@axoniq.io")).whenComplete { _, _ ->
-                    runTask(200) {
+                    runTask(Schedulers.boundedElastic(), 200) {
                         logger.info("{} changed mail to @axoniq.io", completeName)
                         commandGateway.send<String>(RegisterParticipant("$completeName@gmail.com"))
                             .whenComplete { id, t ->

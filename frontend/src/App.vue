@@ -105,35 +105,37 @@ function openAuctionSource() {
   }
 
   auctionSource.onmessage = (ev) => {
-    const data = JSON.parse(ev.data) as ActiveAuction;
-    const objectName = ownerships[data.objectId]?.name || data.objectId;
-    const bidder = data.currentBidder ? toName(participants[data.currentBidder]?.email || data.currentBidder) : null;
-    if (data.state === "ENDED") {
-      addEvent({
-        auctionId: data.identifier,
-        objectName: objectName,
-        type: 'Auction won',
-        value: bidder || 'No one'
-      })
-      delete auctions[data.identifier]
-    } else {
-      if (data.currentBidder) {
+    const datas = JSON.parse(ev.data) as ActiveAuction[];
+    datas.forEach(data => {
+      const objectName = ownerships[data.objectId]?.name || data.objectId;
+      const bidder = data.currentBidder ? toName(participants[data.currentBidder]?.email || data.currentBidder) : null;
+      if (data.state === "ENDED") {
         addEvent({
           auctionId: data.identifier,
           objectName: objectName,
-          type: 'New bid',
-          value: `${data.currentBid} by ${bidder || 'Unknown'}`
+          type: 'Auction won',
+          value: bidder || 'No one'
         })
+        delete auctions[data.identifier]
       } else {
-        addEvent({
-          auctionId: data.identifier,
-          objectName: objectName,
-          type: 'New Auction',
-          value: ''
-        })
+        if (data.currentBidder) {
+          addEvent({
+            auctionId: data.identifier,
+            objectName: objectName,
+            type: 'New bid',
+            value: `${data.currentBid} by ${bidder || 'Unknown'}`
+          })
+        } else {
+          addEvent({
+            auctionId: data.identifier,
+            objectName: objectName,
+            type: 'New Auction',
+            value: ''
+          })
+        }
+        auctions[data.identifier] = data
       }
-      auctions[data.identifier] = data
-    }
+    })
   }
 }
 
@@ -157,12 +159,14 @@ function openParticipantSource() {
   }
 
   participantSource.onmessage = (ev) => {
-    const data = JSON.parse(ev.data) as Participant;
-    if(data.terminated) {
-      delete participants[data.id]
-    } else {
-      participants[data.id] = data
-    }
+    const datas = JSON.parse(ev.data) as Participant[];
+    datas.forEach(data => {
+      if (data.terminated) {
+        delete participants[data.id]
+      } else {
+        participants[data.id] = data
+      }
+    })
   }
 }
 
@@ -186,8 +190,10 @@ function openOwnershipSource() {
   }
 
   ownershipSource.onmessage = (ev) => {
-    const data = JSON.parse(ev.data) as ObjectItem;
-    ownerships[data.identifier] = data
+    const datas = JSON.parse(ev.data) as ObjectItem[];
+    datas.forEach(data => {
+      ownerships[data.identifier] = data
+    })
   }
 }
 
@@ -214,8 +220,8 @@ const formatTime = (date: string) => {
 }
 
 const toName = (email: string) => {
-  if(!email || !email.length) {
-    return 'Unknown'
+  if (!email || !email.length) {
+    return '-'
   }
   return email.split("@")[0]
 }
@@ -253,12 +259,13 @@ const toName = (email: string) => {
         </div>
         <div class="col-md-4">
           <div class="d-flex">
-            <h1>Participants ({{Object.keys(participants).length}})</h1>
+            <h1>Participants ({{ Object.keys(participants).length }})</h1>
             <div class="flex-grow-1"></div>
             <nav class="mx-2">
               <ul class="pagination">
-                <li :class="`page-item ${pageNum === participantPage ? 'active' : ''}`" v-for="(page, pageNum) of participantPages">
-                  <a class="page-link" href="#" @click.prevent.stop="participantPage = pageNum">{{pageNum + 1}}</a>
+                <li :class="`page-item ${pageNum === participantPage ? 'active' : ''}`"
+                    v-for="(page, pageNum) of participantPages">
+                  <a class="page-link" href="#" @click.prevent.stop="participantPage = pageNum">{{ pageNum + 1 }}</a>
                 </li>
               </ul>
             </nav>
@@ -281,7 +288,7 @@ const toName = (email: string) => {
               <td>
                 <div v-for="item in row.items" :key="item.id">
                   <div v-if="item.auctioning" style="color: #ff4b01">
-                    {{ item.name }}
+                    {{ item.name }} ({{item.id}})
                   </div>
                   <div v-else>
                     {{ item.name }}
@@ -306,7 +313,7 @@ const toName = (email: string) => {
           </table>
         </div>
         <div class="col-md-4">
-          <h1>Auctions ({{Object.keys(auctions).length}})</h1>
+          <h1>Auctions ({{ Object.keys(auctions).length }})</h1>
           <table class="table table-responsive">
             <thead>
             <tr>

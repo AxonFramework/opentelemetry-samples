@@ -14,23 +14,10 @@
  * limitations under the License.
  */
 
-package io.axoniq.demo.tracing.interfaces
+package io.axoniq.demo.tracing.participants
 
-import org.slf4j.LoggerFactory
-import reactor.core.Disposable
-import reactor.core.scheduler.Scheduler
-import reactor.core.scheduler.Schedulers
-import java.util.concurrent.TimeUnit
-
-
-private val logger = LoggerFactory.getLogger("DemoTaskScheduler")
-
-fun runTask(scheduler: Scheduler, delayInMs: Long, block: () -> Unit): Disposable {
-    return scheduler.schedule({
-        try {
-            block.invoke()
-        } catch (e: Exception) {
-            logger.error("Error", e)
-        }
-    }, delayInMs, TimeUnit.MILLISECONDS)
-}
+data class ParticipantBalanceUpdate(
+    val update: Long,
+    val newBalance: Long,
+    val reference: String,
+)

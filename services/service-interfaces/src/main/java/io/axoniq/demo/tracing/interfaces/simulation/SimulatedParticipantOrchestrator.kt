@@ -55,6 +55,20 @@ class SimulatedParticipantOrchestrator(
         )
     }
 
+    @Scheduled(fixedRate = 60000, initialDelay = 120000)
+    fun killLowestPartcipant() {
+        simulatedParticipants.minBy { it.toDto(false).balance }.let {
+            it.terminate()
+            simulatedParticipants.remove(it)
+
+            queryUpdateEmitter.emit(
+                GetSimulatedParticipants::class.java,
+                { true },
+                SimulatedParticipantDtoResponse(participants = listOf(it.toDto(true)))
+            )
+        }
+    }
+
     @Scheduled(fixedDelay = 1000, initialDelay = 10000)
     fun setup() {
         while (simulatedParticipants.size < desiredCount) {

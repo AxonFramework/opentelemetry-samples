@@ -22,6 +22,7 @@ import io.axoniq.demo.tracing.objectsregistry.AuctionOwnershipInfoItem
 import io.axoniq.demo.tracing.objectsregistry.AuctionOwnershipResponse
 import io.axoniq.demo.tracing.objectsregistry.GetAuctionObjects
 import io.axoniq.demo.tracing.participants.GetBalanceForParticipant
+import io.axoniq.demo.tracing.participants.ParticipantBalanceUpdate
 import org.axonframework.commandhandling.gateway.CommandGateway
 import org.axonframework.messaging.responsetypes.ResponseTypes
 import org.axonframework.queryhandling.QueryGateway
@@ -54,7 +55,8 @@ class SimulatedParticipant(
     private val boughtPendingItems = ConcurrentSkipListMap<String, Long>()
     private val currentItems: MutableMap<String, AuctionOwnershipInfoItem> = ConcurrentSkipListMap()
     private val currentAuctions: MutableList<String> = mutableListOf()
-    private val scheduler = Schedulers.newParallel(email, 1)
+    private val currentAuctionsTime: MutableMap<String, Instant> = mutableMapOf()
+    private val scheduler = Schedulers.newSingle(email)
 
     init {
         initializeOwnershipQuery()
@@ -64,7 +66,7 @@ class SimulatedParticipant(
     }
 
     private fun startAuctionLoop() {
-        this.auctionLoopSubscription = runTask((1000 + (Math.random() * 2000)).toLong()) {
+        this.auctionLoopSubscription = runTask(scheduler, (1000 + (Math.random() * 2000)).toLong()) {
             auctionLoop()
         }
     }
@@ -77,25 +79,27 @@ class SimulatedParticipant(
                 // We need to auction something!
                 val itemToAuction = currentItems.filterKeys { !currentAuctions.contains(it) }.values.randomOrNull()
                 if (itemToAuction != null) {
-                    logger.info("[$email] Wanted to auction item $itemToAuction!")
-                    currentAuctions += itemToAuction.identifier
-                    val minimumBid = if(balance < 0 && currentItems.count { !currentAuctions.contains(it.key) } == 1) {
+                    logger.debug("[$email] Want to auction item $itemToAuction!")
+                    val minimumBid = if (balance < 0 && currentItems.count { !currentAuctions.contains(it.key) } == 1) {
                         abs(balance)
                     } else (200 + 200 * Math.random()).toLong()
-                    commandGateway
-                        .send<Any>(
-                            CreateAuction(itemToAuction.identifier, id,minimumBid)
-                        )
-                        .exceptionallyAsync {
+                    currentAuctions += itemToAuction.identifier
+
+                    commandGateway.send<String>(CreateAuction(itemToAuction.identifier, id, minimumBid))
+                        .thenAccept { auctionId ->
+                            logger.debug("[$email] Started auction for ${itemToAuction.identifier}! ID: $auctionId")
+                        }
+                        .exceptionally {
+                            logger.error("[$email] Exception while sending bid!", it)
                             currentAuctions.remove(itemToAuction.identifier)
-                            return@exceptionallyAsync null
+                            return@exceptionally null
                         }
                 }
                 lastPlacedAuction = Instant.now()
             }
 
 
-            this.auctionLoopSubscription = runTask((3000 + (Math.random() * 7000)).toLong()) {
+            this.auctionLoopSubscription = runTask(scheduler, (3000 + (Math.random() * 7000)).toLong()) {
                 auctionLoop()
             }
         }
@@ -109,10 +113,10 @@ class SimulatedParticipant(
         )
 
         this.activeAuctionSubscription = query.updates()
-            .subscribeOn(scheduler)
+            .publishOn(scheduler)
             .doOnError {
                 logger.error("[$email] Error in GetActiveAuctions updates", it)
-                runTask(500) { initializeActiveAuctionQuery() }
+                runTask(scheduler, 500) { initializeActiveAuctionQuery() }
             }
             .subscribe {
                 handleAuctionUpdate(it)
@@ -121,41 +125,52 @@ class SimulatedParticipant(
     }
 
     private fun handleAuctionUpdate(it: ActiveAuctionItem) {
+        if (it.state == ActiveAuctionState.INACTIVE) {
+            return
+        }
         if (it.state == ActiveAuctionState.REVERTED && currentAuctions.contains(it.identifier)) {
-            currentAuctions.remove(it.identifier)
+            currentAuctions.remove(it.objectId)
             return
         }
         if (it.state == ActiveAuctionState.ENDED) {
             if (it.currentBidder == id) {
-                boughtPendingItems[it.objectId] = it.currentBid ?: 0
+                boughtPendingItems[it.identifier] = it.currentBid ?: 0
             }
             committedAuctionMoney.remove(it.identifier)
             interestMap.remove(it.identifier)
+            if (it.currentBidder == null && currentAuctions.contains(it.objectId)) {
+                currentAuctions.remove(it.objectId)
+            }
             return
         }
         if (it.currentBidder == id) {
             // Woohoo, my bid got finalized. Don't need to do anything
-            logger.info("[$email] My bid of {} on auction {} got confirmed!", it.currentBid, it.identifier)
+            logger.debug(
+                "[$email] My bid of {} on auction {} got confirmed for item {}!",
+                it.currentBid,
+                it.identifier,
+                it.objectId
+            )
             return
         }
 
         val interest = interestMap.computeIfAbsent(it.identifier) { Math.random() }
-        if (interest < 0.7) {
-            return
-        }
 
-        val currentPrice = it.currentBid ?: it.minimumBid ?: 0
+        val currentPrice = (if (it.currentBid != null && ((it.currentBid ?: 0) > (it.minimumBid
+                ?: 0))
+        ) it.currentBid else it.minimumBid) ?: 0
         val ownBid = committedAuctionMoney[it.identifier] ?: -1
-
         if (ownBid > currentPrice) {
             return
         }
 
         val bid = calculateBid(it, interest, currentPrice)
-
+        logger.debug("[$email] Want to bid $bid for current price $currentPrice on auction $it")
         if (bid > currentPrice) {
-            runTask((20 * 30 * Math.random()).toLong()) {
+            committedAuctionMoney[it.identifier] = bid
+            runTask(scheduler, (20 * 30 * Math.random()).toLong()) {
                 spanFactory.createRootTrace { "[$email] sendBid" }.run {
+                    logger.debug("[$email] Bidding $bid on auction $it")
                     commandGateway.send<Boolean>(PlaceBidOnAuction(it.identifier, id, bid)).thenAccept { success ->
                         if (!success) {
                             committedAuctionMoney.remove(it.identifier)
@@ -171,19 +186,18 @@ class SimulatedParticipant(
         interest: Double,
         currentPrice: Long
     ): Long {
-        val currentBidMoney = committedAuctionMoney.filterKeys { id -> id != it.identifier }.values.sum()
+        val currentBidMoney = committedAuctionMoney.filterKeys { id -> id != it.objectId }.values.sum()
         val currentPendingItemMoney = boughtPendingItems.values.sum()
         val availableMoney = balance - currentBidMoney - currentPendingItemMoney
+        if(availableMoney < 0) {
+            return -1
+        }
 
 
         val maxToSpend = interest * availableMoney
         val availableForBid = maxToSpend - currentPrice
         val actualValueForBid = availableForBid * interest * Math.random()
-        val bid = currentPrice + actualValueForBid.toLong()
-        if (bid > currentPrice) {
-            committedAuctionMoney[it.identifier] = bid
-        }
-        return bid
+        return currentPrice + actualValueForBid.toLong()
     }
 
     private fun initializeOwnershipQuery() {
@@ -194,19 +208,19 @@ class SimulatedParticipant(
                 ResponseTypes.instanceOf(AuctionOwnershipInfoItem::class.java)
             )
             query.initialResult()
-                .subscribeOn(scheduler)
+                .publishOn(scheduler)
                 .doOnError {
                     logger.error("[$email] Error in GetAuctionObjects", it)
-                    runTask(500) { initializeOwnershipQuery() }
+                    runTask(scheduler, 500) { initializeOwnershipQuery() }
                 }.subscribe {
                     it.items.filter { l -> l.owner == id }
                         .forEach { l -> handleOwnershipItem(l) }
                 }
             this.ownershipSubscription = query.updates()
-                .subscribeOn(scheduler)
+                .publishOn(scheduler)
                 .doOnError {
                     logger.error("[$email] Error in GetAuctionObjects updates", it)
-                    runTask(500) { initializeOwnershipQuery() }
+                    runTask(scheduler, 500) { initializeOwnershipQuery() }
                 }.subscribe {
                     handleOwnershipItem(it)
                 }
@@ -215,12 +229,11 @@ class SimulatedParticipant(
 
     private fun handleOwnershipItem(item: AuctionOwnershipInfoItem) {
         if (item.owner == id && !currentItems.containsKey(item.identifier)) {
-            logger.info("[$email] Received item ${item.identifier}")
+            logger.debug("[$email] Received item ${item.identifier}")
             currentItems[item.identifier] = item
-            boughtPendingItems.remove(item.identifier)
         }
         if (currentItems.containsKey(item.identifier) && item.owner != id) {
-            logger.info("[$email] Sold item ${item.identifier}")
+            logger.debug("[$email] Sold item ${item.identifier}")
             currentItems.remove(item.identifier)
             currentAuctions.remove(item.identifier)
         }
@@ -231,22 +244,26 @@ class SimulatedParticipant(
             val query = queryGateway.subscriptionQuery(
                 GetBalanceForParticipant(email),
                 ResponseTypes.instanceOf(Long::class.java),
-                ResponseTypes.instanceOf(Long::class.java)
+                ResponseTypes.instanceOf(ParticipantBalanceUpdate::class.java)
             )
             query.initialResult()
-                .subscribeOn(scheduler)
+                .publishOn(scheduler)
                 .doOnError {
                     logger.error("[$email] Error in GetBalanceForParticipant", it)
-                    runTask(500) { initializeBalanceQuery() }
+                    runTask(scheduler, 500) { initializeBalanceQuery() }
                 }
                 .subscribe { balance = it }
             this.balanceSubscription = query.updates()
-                .subscribeOn(scheduler)
+                .publishOn(scheduler)
                 .doOnError {
                     logger.error("[$email] Error in GetBalanceForParticipant updates", it)
-                    runTask(500) { initializeBalanceQuery() }
+                    runTask(scheduler, 500) { initializeBalanceQuery() }
                 }
-                .subscribe { balance = it }
+                .subscribe {
+                    balance = it.newBalance
+                    logger.debug("[$email] balance was updated for ${it.reference}")
+                    boughtPendingItems.remove(it.reference)
+                }
         }
     }
 

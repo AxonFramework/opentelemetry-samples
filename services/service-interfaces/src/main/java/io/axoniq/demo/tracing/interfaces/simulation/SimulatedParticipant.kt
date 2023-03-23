@@ -23,6 +23,8 @@ import io.axoniq.demo.tracing.objectsregistry.AuctionOwnershipResponse
 import io.axoniq.demo.tracing.objectsregistry.GetAuctionObjects
 import io.axoniq.demo.tracing.participants.GetBalanceForParticipant
 import io.axoniq.demo.tracing.participants.ParticipantBalanceUpdate
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Tags
 import org.axonframework.commandhandling.gateway.CommandGateway
 import org.axonframework.messaging.responsetypes.ResponseTypes
 import org.axonframework.queryhandling.QueryGateway
@@ -40,6 +42,7 @@ class SimulatedParticipant(
     private val queryGateway: QueryGateway,
     private val commandGateway: CommandGateway,
     private val spanFactory: SpanFactory,
+    private val meterRegistry: MeterRegistry,
 ) {
     private val biddingFactor = Math.random()
     private lateinit var activeAuctionSubscription: Disposable
@@ -69,7 +72,6 @@ class SimulatedParticipant(
     inner class ActiveAuction(
         val objectId: String,
         val objectName: String,
-        var commandSentAt: Instant = Instant.now(),
         var auctionId: String? = null,
         var createdAt: Instant? = null,
         var receivedBalanceUpdate: Boolean = false,
@@ -130,6 +132,17 @@ class SimulatedParticipant(
         initializeBalanceQuery()
         initializeActiveAuctionQuery()
         startAuctionLoop()
+
+        val name = email.split("@")[0]
+        meterRegistry.gauge("participant_money", Tags.of("name", name), balance) {
+            balance.toDouble()
+        }
+        meterRegistry.gauge("participant_worth", Tags.of("name", name), items) {
+            balance.toDouble() + items.values.sumOf { it.boughtFor }
+        }
+        meterRegistry.gauge("participant_items", Tags.of("name", name), items) {
+            items.size.toDouble()
+        }
     }
 
     private fun startAuctionLoop() {
@@ -149,22 +162,24 @@ class SimulatedParticipant(
                 logger.debug("[$email] Want to auction item $itemToAuction!")
                 val minimumBid = (200 + 200 * Math.random()).toLong()
 
-                val auctionState = ActiveAuction(
-                    objectId = itemToAuction.identifier,
-                    objectName = itemToAuction.name,
-                )
-                auctions[itemToAuction.identifier] = auctionState
-                commandGateway.send<String>(CreateAuction(itemToAuction.identifier, id, minimumBid))
-                    .thenAccept { auctionId ->
-                        auctionState.createdAt = Instant.now()
-                        auctionState.auctionId = auctionId
-                        logger.info("[$email] Started auction for ${itemToAuction.name}! AuctionId: $auctionId")
-                    }
-                    .exceptionally {
-                        logger.error("[$email] Exception while sending bid!", it)
-                        auctions.remove(itemToAuction.identifier)
-                        return@exceptionally null
-                    }
+                try {
+                    val auctionId = commandGateway.sendAndWait<String>(CreateAuction(
+                        objectId = itemToAuction.identifier,
+                        owner = id,
+                        minimumPrice = minimumBid
+                    ))
+
+                    auctions[itemToAuction.identifier] = ActiveAuction(
+                        objectId = itemToAuction.identifier,
+                        objectName = itemToAuction.name,
+                        createdAt = Instant.now(),
+                        auctionId = auctionId
+                    )
+                    logger.info("[$email] Started auction for ${itemToAuction.name}! AuctionId: $auctionId")
+                } catch (e: Exception) {
+                    logger.error("[$email] Exception while sending bid!", e)
+                    auctions.remove(itemToAuction.identifier)
+                }
             }
         }
 
@@ -374,11 +389,11 @@ class SimulatedParticipant(
 
     fun toDto(terminated: Boolean = false): SimulatedParticipantDto {
         return SimulatedParticipantDto(
-            id,
-            terminated,
-            email,
-            balance,
-            bids.filterValues { it.currentBid > 0 }.map { (_, value) ->
+            id = id,
+            terminated = terminated,
+            email = email,
+            balance = balance,
+            activeBids = bids.filterValues { it.currentBid > 0 }.map { (_, value) ->
                 ActiveBidDto(
                     auctionId = value.auctionId,
                     objectId = value.objectId,
@@ -390,16 +405,16 @@ class SimulatedParticipant(
                     receivedItemUpdate = value.receivedItemUpdate
                 )
             },
-            items.map {
+            items = items.map {
                 val auction = auctions[it.key]
                 ParticipantItem(
-                    it.value.identifier,
-                    it.value.name,
-                    it.value.boughtFor,
-                    auction != null,
-                    auction?.createdAt,
-                    auction?.receivedBalanceUpdate,
-                    auction?.receivedItemUpdate,
+                    id = it.value.identifier,
+                    name = it.value.name,
+                    boughtFor = it.value.boughtFor,
+                    auctioning = auction != null,
+                    auctionStarted = auction?.createdAt,
+                    receivedBalanceUpdate = auction?.receivedBalanceUpdate,
+                    receivedItemUpdate = auction?.receivedItemUpdate,
                 )
             }
         )

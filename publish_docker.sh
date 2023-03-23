@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 #
 # Copyright (c) 2023-2023. AxonIQ
 #
@@ -14,8 +15,15 @@
 # limitations under the License.
 #
 
-spring.profiles.active=core
-axon.axonserver.servers=localhost:9124
-spring.main.web-application-type=reactive
-spring.application.name=Participants
-axon.eventhandling.processors.bla.batch-size=100
+docker push morlack/axon-observability-service-auctions
+docker push morlack/axon-observability-service-auction-query
+docker push morlack/axon-observability-service-auction-object-registry
+docker push morlack/axon-observability-service-participants
+docker push morlack/axon-observability-service-interfaces
+docker push morlack/axon-observability-service-allinclusive
+
+cd frontend-landing
+docker build .
+docker build . -t morlack/axon-observability-landing
+docker push morlack/axon-observability-landing
+cd ..

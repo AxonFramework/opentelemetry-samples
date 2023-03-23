@@ -64,7 +64,7 @@ class FrontendController(
             .doOnTerminate {
                 subscriptionQuery.close()
             }
-            .buffer(Duration.ofMillis(200))
+            .buffer(Duration.ofMillis(500))
             .asServerSentEvents()
             .withHeartbeat()
 
@@ -108,7 +108,7 @@ class FrontendController(
             .doOnTerminate {
                 query.close()
             }
-            .buffer(Duration.ofMillis(200))
+            .buffer(Duration.ofMillis(500))
             .asServerSentEvents()
             .withHeartbeat()
 

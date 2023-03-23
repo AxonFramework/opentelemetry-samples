@@ -81,7 +81,7 @@
                     </from>
                     <to>
                         <image>
-                            ${project.artifactId}:latest
+                            docker.io/morlack/axon-observability-${project.artifactId}:latest
                         </image>
                     </to>
                     <extraDirectories>

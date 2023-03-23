@@ -32,7 +32,7 @@ const print = (item: any) => {
             <td v-if="!item.auctioning"><i class="bi bi-bag-check"/> Bought</td>
             <td v-else><i class="bi bi-shop"/> Selling</td>
           </tr>
-          <tr v-for="item of participant.activeBids" @click="() => print(item)" :key="item.auctionId" class="text-muted"
+          <tr v-for="item in participant.activeBids" @click="() => print(item)" :key="item.auctionId" class="text-muted"
               :title="`Interest: ${item.interest}`">
             <td>{{ item.objectName }}</td>
             <td><i class="bi bi-cart"/> ${{ item.bid }}</td>

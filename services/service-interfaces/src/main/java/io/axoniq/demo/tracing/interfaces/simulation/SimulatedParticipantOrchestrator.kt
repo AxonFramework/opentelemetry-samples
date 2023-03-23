@@ -19,6 +19,7 @@ package io.axoniq.demo.tracing.interfaces.simulation
 import com.github.javafaker.Faker
 import io.axoniq.demo.tracing.objectsregistry.SubmitAuctionObject
 import io.axoniq.demo.tracing.participants.RegisterParticipant
+import io.micrometer.core.instrument.MeterRegistry
 import org.axonframework.commandhandling.gateway.CommandGateway
 import org.axonframework.common.IdentifierFactory
 import org.axonframework.queryhandling.QueryGateway
@@ -33,7 +34,8 @@ class SimulatedParticipantOrchestrator(
     private val queryGateway: QueryGateway,
     private val commandGateway: CommandGateway,
     private val spanFactory: SpanFactory,
-    private val queryUpdateEmitter: QueryUpdateEmitter
+    private val queryUpdateEmitter: QueryUpdateEmitter,
+    private val meterRegistry: MeterRegistry,
 ) {
     val auctionHouseId = IdentifierFactory.getInstance().generateIdentifier()
     private val faker = Faker()
@@ -58,6 +60,7 @@ class SimulatedParticipantOrchestrator(
     @Scheduled(fixedDelay = 1000, initialDelay = 10000)
     fun setup() {
         while (simulatedParticipants.size < desiredCount) {
+            faker.elderScrolls().dragon()
             val email = "${faker.name().firstName()}@${auctionHouseId}.io"
             val id = commandGateway.sendAndWait<String>(RegisterParticipant(email))
             1.rangeTo(3).forEach { _ ->
@@ -71,6 +74,7 @@ class SimulatedParticipantOrchestrator(
                 commandGateway = commandGateway,
                 spanFactory = spanFactory,
                 auctionHouseId = auctionHouseId,
+                meterRegistry = meterRegistry
             )
         }
 

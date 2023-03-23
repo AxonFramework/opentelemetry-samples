@@ -1,5 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Agent Local Jaeger Demo" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <option name="DEBUG_MODE" value="true" />
     <envs>
       <env name="OTEL_EXPORTER_OTLP_ENDPOINT" value="http://127.0.0.1:4317" />
       <env name="OTEL_RESOURCE_ATTRIBUTES" value="service.name=TracingDemo,service.version=1.1,deployment.environment=production" />
@@ -8,7 +9,7 @@
     </envs>
     <module name="core" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="io.axoniq.demo.tracing.DemoApplication" />
-    <option name="VM_PARAMETERS" value="-javaagent:opentelemetry-javaagent-1.23.jar -Dio.opentelemetry.context.enableStrictContext=true" />
+    <option name="VM_PARAMETERS" value="-javaagent:opentelemetry-javaagent.jar -Dio.opentelemetry.context.enableStrictContext=true" />
     <option name="WORKING_DIRECTORY" value="file://$PROJECT_DIR$" />
     <extension name="coverage">
       <pattern>

@@ -10,7 +10,7 @@ function fetchAmountOfparticipants() {
     return
   }
   participantAmountInFlight = true;
-  fetch('/api/participants/count', {method: 'GET'}).then((r: Response) => {
+  fetch(window.location.pathname + 'api/participants/count', {method: 'GET'}).then((r: Response) => {
     participantAmountInFlight = false;
     r.text().then(t => participantAmount.value = parseInt(t))
   }).catch(e => {
@@ -19,7 +19,7 @@ function fetchAmountOfparticipants() {
 }
 
 function updateParticipantAmount(amount: number) {
-  fetch(`/api/participants/count/${amount}`, {method: 'PUT'}).then((r: Response) => {
+  fetch(window.location.pathname + `api/participants/count/${amount}`, {method: 'PUT'}).then((r: Response) => {
     fetchAmountOfparticipants()
   })
 }

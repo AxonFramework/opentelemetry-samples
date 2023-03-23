@@ -25,6 +25,7 @@ interface Event {
 }
 
 let index = 0;
+
 function addEvent(content: Omit<Event, 'index'>) {
   index++
   events.value = [{...content, index}, ...events.value.splice(0, 20)]
@@ -33,7 +34,7 @@ function addEvent(content: Omit<Event, 'index'>) {
 let auctionSource: EventSource | null = null;
 
 function openAuctionSource() {
-  auctionSource = new EventSource(`/api/auctions`)
+  auctionSource = new EventSource(window.location.pathname + `api/auctions`)
   auctionSource.onopen = () => {
     Object.keys(auctions).forEach(key => {
       delete auctions [key]
@@ -87,7 +88,7 @@ openAuctionSource()
 let participantSource: EventSource | null = null;
 
 function openParticipantSource() {
-  participantSource = new EventSource(`/api/participants`)
+  participantSource = new EventSource(window.location.pathname + `api/participants`)
   participantSource.onopen = () => {
     Object.keys(participants).forEach(key => {
       delete participants [key]
@@ -118,7 +119,7 @@ openParticipantSource()
 let ownershipSource: EventSource | null = null;
 
 function openOwnershipSource() {
-  ownershipSource = new EventSource(`/api/ownership`)
+  ownershipSource = new EventSource(window.location.pathname + `api/ownership`)
   ownershipSource.onopen = () => {
     Object.keys(ownerships).forEach(key => {
       delete ownerships [key]
@@ -176,13 +177,18 @@ const tab = ref('auctions')
         <div class="col-md-12 mb-4">
           <ul class="nav nav-pills">
             <li class="nav-item">
-              <a :class="`nav-link ${tab === 'auctions' ? 'active' : ''}`" aria-current="page" href="#" @click.prevent.stop="() => tab = 'auctions'">Auctions ({{ Object.keys(auctions).length }})</a>
+              <a :class="`nav-link ${tab === 'auctions' ? 'active' : ''}`" aria-current="page" href="#"
+                 @click.prevent.stop="() => tab = 'auctions'">Auctions ({{ Object.keys(auctions).length }})</a>
             </li>
             <li class="nav-item">
-              <a :class="`nav-link ${tab === 'participants' ? 'active' : ''}`" aria-current="page" href="#" @click.prevent.stop="() => tab = 'participants'">Participants ({{ Object.keys(participants).length }})</a>
+              <a :class="`nav-link ${tab === 'participants' ? 'active' : ''}`" aria-current="page" href="#"
+                 @click.prevent.stop="() => tab = 'participants'">Participants ({{
+                  Object.keys(participants).length
+                }})</a>
             </li>
             <li class="nav-item">
-              <a :class="`nav-link ${tab === 'config' ? 'active' : ''}`" aria-current="page" href="#" @click.prevent.stop="() => tab = 'config'">Configuration</a>
+              <a :class="`nav-link ${tab === 'config' ? 'active' : ''}`" aria-current="page" href="#"
+                 @click.prevent.stop="() => tab = 'config'">Configuration</a>
             </li>
           </ul>
         </div>
@@ -238,7 +244,9 @@ const tab = ref('auctions')
 
         <div class="col-md-12" v-if="tab === 'participants'">
           <div class="row">
-            <p>Total participant auctions: {{Object.values(participants).flatMap(p => p.items.filter(i => i.auctioning)).length}} / Total participant bidding: {{Object.values(participants).flatMap(p => p.activeBids).length}}</p>
+            <p>Total participant auctions:
+              {{ Object.values(participants).flatMap(p => p.items.filter(i => i.auctioning)).length }} / Total
+              participant bidding: {{ Object.values(participants).flatMap(p => p.activeBids).length }}</p>
 
             <div class="col-md-3" v-for="participant in participants">
               <ParticipantCard :participant="participant"/>

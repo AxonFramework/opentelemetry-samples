@@ -1,0 +1,18 @@
+@startuml
+
+participant "A: Caller" as ac
+participant "A: CommandBus" as ab
+participant "AxonServer" as asee
+participant "B: CommandBus" as bb
+participant "B: Handler" as bh
+
+ac -> ab: Command
+ab -> asee: Command
+asee -> bb: Command
+bb -> bh: Command
+bb <-- bh: Result
+asee <-- bb: Result
+ab <-- asee: Result
+ac <-- ab: Result
+
+@enduml

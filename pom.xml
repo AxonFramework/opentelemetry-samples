@@ -35,6 +35,7 @@
         <module>core</module>
         <module>frontend</module>
         <module>services</module>
+        <module>frontend-landing</module>
     </modules>
 
     <properties>

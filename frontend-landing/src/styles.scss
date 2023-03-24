@@ -73,6 +73,10 @@ h3 {
   font-size: 16px;
   font-weight: 600
 }
+h4 {
+  font-size: 14px;
+  font-weight: 600
+}
 
 .container-fluid {
   --bs-gutter-x: 0
@@ -103,4 +107,8 @@ a {
 }
 tr td, tr th {
   padding: 0.2rem !important;
+}
+
+body {
+  font-size: 14px;
 }

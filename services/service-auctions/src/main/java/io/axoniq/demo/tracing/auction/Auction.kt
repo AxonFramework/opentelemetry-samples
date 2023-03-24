@@ -45,10 +45,11 @@ class Auction {
 
     @CommandHandler
     constructor(command: CreateAuction, @Autowired deadlineManager: DeadlineManager) {
-        val endTime = Instant.now().plusSeconds(10)
+        val endTime = Instant.now().plusSeconds(4)
         AggregateLifecycle.apply(
             AuctionCreated(
                 IdentifierFactory.getInstance().generateIdentifier(),
+                command.auctionHouseId,
                 command.objectId,
                 command.owner,
                 command.minimumPrice,

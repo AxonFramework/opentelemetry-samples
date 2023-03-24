@@ -34,6 +34,7 @@ class AuctionProjection(
         val auction = repository.save(
             AuctionInformation(
                 event.auctionId,
+                event.auctionHouseId,
                 event.objectId,
                 ActiveAuctionState.STARTED,
                 event.minimumPrice,
@@ -42,21 +43,21 @@ class AuctionProjection(
                 event.endTime
             )
         )
-        queryUpdateEmitter.emit(GetActiveAuctions::class.java, { true }, auction.toDto())
+        auction.emit()
     }
 
     @EventHandler
     fun on(event: AuctionEnded) {
         val auction = repository.findById(event.auctionId).orElseThrow()
         auction.state = ActiveAuctionState.ENDED
-        queryUpdateEmitter.emit(GetActiveAuctions::class.java, { true }, auction.toDto())
+        auction.emit()
     }
 
     @EventHandler
     fun on(event: AuctionReverted) {
         val auction = repository.findById(event.auctionId).orElseThrow()
         auction.state = ActiveAuctionState.REVERTED
-        queryUpdateEmitter.emit(GetActiveAuctions::class.java, { true }, auction.toDto())
+        auction.emit()
     }
 
     @EventHandler
@@ -64,12 +65,17 @@ class AuctionProjection(
         val auction = repository.findById(event.auctionId).orElseThrow()
         auction.currentBid = event.price
         auction.currentBidder = event.participant
-        queryUpdateEmitter.emit(GetActiveAuctions::class.java, { true }, auction.toDto())
+        auction.emit()
+    }
+
+    private fun AuctionInformation.emit() {
+        queryUpdateEmitter.emit(GetActiveAuctions::class.java, { it.auctionHouseId == this.auctionHouseId }, this.toDto())
+
     }
 
     @QueryHandler
     fun on(query: GetActiveAuctions): ActiveAuctionsResponse {
-        return ActiveAuctionsResponse(repository.findAllByState(ActiveAuctionState.STARTED).map { it.toDto() })
+        return ActiveAuctionsResponse(repository.findAllByStateAndAuctionHouseId(ActiveAuctionState.STARTED, query.auctionHouseId).map { it.toDto() })
     }
 
     fun AuctionInformation.toDto() =

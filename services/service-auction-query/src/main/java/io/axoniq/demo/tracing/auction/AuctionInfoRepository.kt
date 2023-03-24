@@ -16,11 +16,10 @@
 
 package io.axoniq.demo.tracing.auction
 
-import org.springframework.context.annotation.Profile
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Repository
 
 @Repository
 interface AuctionInfoRepository : JpaRepository<AuctionInformation, String> {
-    fun findAllByState(state: ActiveAuctionState): List<AuctionInformation>
+    fun findAllByStateAndAuctionHouseId(state: ActiveAuctionState, auctionHouseId: String): List<AuctionInformation>
 }

@@ -53,7 +53,7 @@ class FrontendController(
     @GetMapping("auctions")
     fun auctions(): Flux<ServerSentEvent<*>> {
         val subscriptionQuery = queryGateway.subscriptionQuery(
-            GetActiveAuctions(),
+            GetActiveAuctions(orchestrator.auctionHouseId),
             ResponseTypes.instanceOf(ActiveAuctionsResponse::class.java),
             ResponseTypes.instanceOf(ActiveAuctionItem::class.java)
         )

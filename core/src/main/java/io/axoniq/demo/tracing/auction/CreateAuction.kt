@@ -17,6 +17,7 @@
 package io.axoniq.demo.tracing.auction
 
 data class CreateAuction(
+    val auctionHouseId: String,
     val objectId: String,
     val owner: String,
     val minimumPrice: Long,

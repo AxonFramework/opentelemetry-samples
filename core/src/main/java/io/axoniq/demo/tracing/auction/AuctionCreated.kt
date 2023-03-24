@@ -20,6 +20,7 @@ import java.time.Instant
 
 data class AuctionCreated(
     val auctionId: String,
+    val auctionHouseId: String,
     val objectId: String,
     val owner: String,
     val minimumPrice: Long,

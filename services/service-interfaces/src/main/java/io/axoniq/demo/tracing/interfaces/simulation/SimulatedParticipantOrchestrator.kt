@@ -60,7 +60,6 @@ class SimulatedParticipantOrchestrator(
     @Scheduled(fixedDelay = 1000, initialDelay = 10000)
     fun setup() {
         while (simulatedParticipants.size < desiredCount) {
-            faker.elderScrolls().dragon()
             val email = "${faker.name().firstName()}@${auctionHouseId}.io"
             val id = commandGateway.sendAndWait<String>(RegisterParticipant(email))
             1.rangeTo(3).forEach { _ ->

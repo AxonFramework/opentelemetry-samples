@@ -25,6 +25,7 @@ import java.time.Instant
 data class AuctionInformation(
     @Id
     val identifier: String,
+    val auctionHouseId: String,
     val objectId: String,
     var state: ActiveAuctionState,
     var minimumBid: Long?,

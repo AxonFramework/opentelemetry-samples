@@ -76,7 +76,7 @@
                 <configuration>
                     <from>
                         <image>
-                            eclipse-temurin:17
+                            openjdk:17
                         </image>
                     </from>
                     <to>

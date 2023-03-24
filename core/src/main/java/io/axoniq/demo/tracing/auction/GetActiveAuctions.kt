@@ -16,4 +16,6 @@
 
 package io.axoniq.demo.tracing.auction
 
-class GetActiveAuctions
+class GetActiveAuctions(
+    val auctionHouseId: String,
+)

@@ -1,0 +1,26 @@
+@startuml
+
+participant "A: \nCaller" as ac
+participant "A: \nAxonServerQueryBus" as ab
+participant "\nAxonServer" as asee
+participant "\nB: AxonServerQueryBus" as bb
+queue "B: \nExecutor" as be
+participant "B: \nSimpleQueryBus" as blb
+participant "B: \nHandler" as bh
+
+
+ac -> ab: Query
+ab -> asee: Query
+asee -> bb: Query
+bb -> be: QueryProcessingTask
+be -> blb: Query
+blb -> bh: Query
+blb <-- bh: QueryResult
+bb <-- blb: QueryResult
+asee <-- bb: QueryResult
+ac <-- asee: QueryResult
+
+
+
+
+@enduml

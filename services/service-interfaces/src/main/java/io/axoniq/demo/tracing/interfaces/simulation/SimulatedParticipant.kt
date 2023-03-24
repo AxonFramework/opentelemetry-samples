@@ -34,6 +34,8 @@ import reactor.core.Disposable
 import reactor.core.scheduler.Schedulers
 import java.time.Instant
 import java.util.concurrent.ConcurrentSkipListMap
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class SimulatedParticipant(
     private val id: String,
@@ -146,45 +148,107 @@ class SimulatedParticipant(
     }
 
     private fun startAuctionLoop() {
-        this.auctionLoopSubscription = runTask(scheduler, (1000 + (Math.random() * 2000)).toLong()) {
-            auctionLoop()
-        }
+        this.auctionLoopSubscription = scheduler.schedulePeriodically(
+            this::auctionLoop,
+            (1000 + (Math.random() * 2000)).toLong(),
+            (700 + (Math.random() * 300)).toLong(),
+            TimeUnit.MILLISECONDS
+        )
     }
 
     private fun auctionLoop() {
         spanFactory.createRootTrace { "[$email] auctionLoop" }.run {
-            val feelingFactor = Math.random()
-            if (feelingFactor <= 0.6) {
-                return@run
-            }
-            // I want to auction something!
-            pickItemToAuction()?.let { itemToAuction ->
-                logger.debug("[$email] Want to auction item $itemToAuction!")
-                val minimumBid = (200 + 200 * Math.random()).toLong()
+            maybeSellSomething()
+            bidOnAuctions()
+        }
+    }
 
-                try {
-                    val auctionId = commandGateway.sendAndWait<String>(CreateAuction(
-                        objectId = itemToAuction.identifier,
-                        owner = id,
-                        minimumPrice = minimumBid
-                    ))
-
-                    auctions[itemToAuction.identifier] = ActiveAuction(
-                        objectId = itemToAuction.identifier,
-                        objectName = itemToAuction.name,
-                        createdAt = Instant.now(),
-                        auctionId = auctionId
-                    )
-                    logger.info("[$email] Started auction for ${itemToAuction.name}! AuctionId: $auctionId")
-                } catch (e: Exception) {
-                    logger.error("[$email] Exception while sending bid!", e)
-                    auctions.remove(itemToAuction.identifier)
-                }
+    private val biddingGate = AtomicBoolean()
+    private fun bidOnAuctions() {
+        if(biddingGate.compareAndExchange(false, true)) {
+            try {
+                queryGateway.query(
+                    GetActiveAuctions(auctionHouseId),
+                    ResponseTypes.instanceOf(ActiveAuctionsResponse::class.java)
+                ).get().auctions.forEach { maybeBidOnAuction(it) }
+            } finally {
+                biddingGate.set(false)
             }
         }
 
-        this.auctionLoopSubscription = runTask(scheduler, (3000 + (Math.random() * 7000)).toLong()) {
-            auctionLoop()
+    }
+
+    private fun maybeBidOnAuction(update: ActiveAuctionItem) {
+        if (auctions.containsKey(update.objectId)) {
+            // My own auction, I won't bid
+            return
+        }
+
+        val currentBidInfo = bids.computeIfAbsent(update.identifier) {
+            ActiveBid(
+                objectId = update.objectId,
+                auctionId = update.identifier,
+                interest = Math.random(),
+                currentBid = 0
+            )
+        }
+        if (currentBidInfo.interest < 0.3) {
+            return
+        }
+
+        val price: Long = when {
+            (update.currentBid ?: 0) > 0 -> update.currentBid ?: 0
+            else -> (update.minimumBid ?: 0)
+        }
+        if (currentBidInfo.currentBid > price) {
+            // This is an older update. There will come one a bit later with our bid!
+            return
+        }
+
+        val bid = calculateBid(update, currentBidInfo, price)
+        logger.debug("[$email] Want to bid $bid for current price $price on auction $update")
+        if (bid > price) {
+            currentBidInfo.currentBid = bid
+            spanFactory.createRootTrace { "[$email] sendBid" }.run {
+                logger.debug("[$email] Bidding $bid on auction $update")
+                commandGateway.send<Boolean>(PlaceBidOnAuction(update.identifier, id, bid))
+            }
+        } else {
+            currentBidInfo.currentBid = 0
+        }
+    }
+
+    private fun maybeSellSomething() {
+        val feelingFactor = Math.random()
+        if (feelingFactor <= 0.95) {
+            return
+        }
+        // I want to auction something!
+        pickItemToAuction()?.let { itemToAuction ->
+            logger.debug("[$email] Want to auction item $itemToAuction!")
+            val minimumBid = (200 + 200 * Math.random()).toLong()
+
+            try {
+                val auctionId = commandGateway.sendAndWait<String>(
+                    CreateAuction(
+                        auctionHouseId = auctionHouseId,
+                        objectId = itemToAuction.identifier,
+                        owner = id,
+                        minimumPrice = minimumBid
+                    )
+                )
+
+                auctions[itemToAuction.identifier] = ActiveAuction(
+                    objectId = itemToAuction.identifier,
+                    objectName = itemToAuction.name,
+                    createdAt = Instant.now(),
+                    auctionId = auctionId
+                )
+                logger.info("[$email] Started auction for ${itemToAuction.name}! AuctionId: $auctionId")
+            } catch (e: Exception) {
+                logger.error("[$email] Exception while sending bid!", e)
+                auctions.remove(itemToAuction.identifier)
+            }
         }
     }
 
@@ -196,7 +260,7 @@ class SimulatedParticipant(
 
     private fun initializeActiveAuctionQuery() {
         val query = queryGateway.subscriptionQuery(
-            GetActiveAuctions(),
+            GetActiveAuctions(auctionHouseId),
             ResponseTypes.instanceOf(ActiveAuctionsResponse::class.java),
             ResponseTypes.instanceOf(ActiveAuctionItem::class.java)
         )
@@ -244,45 +308,6 @@ class SimulatedParticipant(
                 update.objectId
             )
             return
-        }
-        if (auctions.containsKey(update.objectId)) {
-            // My own auction, I won't bid
-            return
-        }
-
-        val currentBidInfo = bids.computeIfAbsent(update.identifier) {
-            ActiveBid(
-                objectId = update.objectId,
-                auctionId = update.identifier,
-                interest = Math.random(),
-                currentBid = 0
-            )
-        }
-        if (currentBidInfo.interest < 0.3) {
-            return
-        }
-
-        val price: Long = when {
-            (update.currentBid ?: 0) > 0 -> update.currentBid ?: 0
-            else -> (update.minimumBid ?: 0)
-        }
-        if (currentBidInfo.currentBid > price) {
-            // This is an older update. There will come one a bit later with our bid!
-            return
-        }
-
-        val bid = calculateBid(update, currentBidInfo, price)
-        logger.debug("[$email] Want to bid $bid for current price $price on auction $update")
-        if (bid > price) {
-            currentBidInfo.currentBid = bid
-            runTask(scheduler, (20 * 30 * Math.random()).toLong()) {
-                spanFactory.createRootTrace { "[$email] sendBid" }.run {
-                    logger.debug("[$email] Bidding $bid on auction $update")
-                    commandGateway.send<Boolean>(PlaceBidOnAuction(update.identifier, id, bid))
-                }
-            }
-        } else {
-            currentBidInfo.currentBid = 0
         }
     }
 

@@ -37,7 +37,7 @@ class SimulatedParticipantOrchestrator(
     private val queryUpdateEmitter: QueryUpdateEmitter,
     private val meterRegistry: MeterRegistry,
 ) {
-    val auctionHouseId = IdentifierFactory.getInstance().generateIdentifier()
+    var auctionHouseId = IdentifierFactory.getInstance().generateIdentifier()
     private val faker = Faker()
 
     private val simulatedParticipants = mutableListOf<SimulatedParticipant>()
@@ -46,6 +46,13 @@ class SimulatedParticipantOrchestrator(
     @QueryHandler
     fun handle(query: GetSimulatedParticipants): SimulatedParticipantDtoResponse {
         return SimulatedParticipantDtoResponse(simulatedParticipants.map { it.toDto() })
+    }
+
+    @Scheduled(fixedRate = 60 * 60 * 1000, initialDelay = 60 * 60 * 1000)
+    fun createNewAuctionHouse() {
+        auctionHouseId = IdentifierFactory.getInstance().generateIdentifier()
+        simulatedParticipants.forEach { it.terminate() }
+        simulatedParticipants.clear()
     }
 
     @Scheduled(fixedRate = 200)

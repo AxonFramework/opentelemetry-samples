@@ -52,6 +52,11 @@
             <artifactId>firestarter-spring-starter</artifactId>
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
+<!--        <dependency>-->
+<!--            <groupId>io.axoniq.inspector</groupId>-->
+<!--            <artifactId>inspector-axon-spring-boot-starter</artifactId>-->
+<!--            <version>0.1.1</version>-->
+<!--        </dependency>-->
         <!-- Axon -->
         <dependency>
             <groupId>org.axonframework</groupId>

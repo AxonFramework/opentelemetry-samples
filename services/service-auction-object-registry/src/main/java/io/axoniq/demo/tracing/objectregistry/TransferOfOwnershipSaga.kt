@@ -54,21 +54,22 @@ class TransferOfOwnershipSaga {
         amount = event.winningPrice!!
         objectId = event.objectId
         // We need to transfer from original owner to new one
-        commandGateway.send<Void>(DeductBalance(buyer, event.auctionId, amount))
-            .exceptionally {
-                commandGateway.send<Void>(RevertAuction(auctionId = event.auctionId, reason = "Buyer didn't have the money!"))
-                    .get()
-            }
+        try {
+            commandGateway.sendAndWait<Void>(DeductBalance(buyer, event.auctionId, amount))
+
+        } catch (e: Exception) {
+            commandGateway.sendAndWait<Void>(RevertAuction(auctionId = event.auctionId, reason = "Buyer didn't have the money!"))
+        }
     }
 
     @SagaEventHandler(associationProperty = "reference", keyName = "auctionId")
     fun on(event: BalanceDeducted, commandGateway: CommandGateway) {
-        commandGateway.send<Void>(IncreaseBalance(seller, event.reference, amount))
+        commandGateway.sendAndWait<Void>(IncreaseBalance(seller, event.reference, amount))
     }
 
     @SagaEventHandler(associationProperty = "reference", keyName = "auctionId")
     @EndSaga
     fun on(event: BalanceAddedToParticipant, commandGateway: CommandGateway) {
-        commandGateway.send<Void>(TransferAuctionObject(objectId, buyer))
+        commandGateway.sendAndWait<Void>(TransferAuctionObject(objectId, buyer))
     }
 }

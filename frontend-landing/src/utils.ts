@@ -1,5 +1,3 @@
-
-
 /*
  * Copyright (c) 2023-2023. AxonIQ
  *
@@ -21,4 +19,13 @@ export const toName = (email: string) => {
         return '-'
     }
     return email.split("@")[0]
+}
+
+
+export const errorRate = (rate: number) => {
+    return {errorRate: {rate: rate}}
+}
+
+export const delay = (delay: number) => {
+    return {fixedDelay: {delay: delay}}
 }

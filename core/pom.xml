@@ -12,4 +12,12 @@
     <artifactId>core</artifactId>
     <name>Axon OpenTelemetry Demo core</name>
     <description>Contains all business logic for the demo application</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.jobrunr</groupId>
+            <artifactId>jobrunr-spring-boot-3-starter</artifactId>
+            <version>6.1.0</version>
+        </dependency>
+    </dependencies>
 </project>

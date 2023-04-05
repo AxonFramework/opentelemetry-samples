@@ -86,7 +86,7 @@ services:
       - "9024:8024"
       - "9124:8124"
     environment:
-      - JAVA_TOOL_OPTIONS=-Xmx512m
+      - JAVA_TOOL_OPTIONS=-Xmx256m
     volumes:
       - data-as-1:/axonserver/data
       - events-as-1:/axonserver/events
@@ -105,7 +105,7 @@ services:
       - AXON_AXONSERVER_SERVERS=axon-server-1:8124
       - MM_TAG_APP=participants
       - MM_TAG_SERVER=morlack-laptop
-      - JAVA_TOOL_OPTIONS=-Xmx512m
+      - JAVA_TOOL_OPTIONS=-Xmx256m
     depends_on:
       - jaeger-collector
       - axon-server-1
@@ -124,7 +124,7 @@ services:
       - AXON_AXONSERVER_SERVERS=axon-server-1:8124
       - MM_TAG_APP=auction-object-registry
       - MM_TAG_SERVER=morlack-laptop
-      - JAVA_TOOL_OPTIONS=-Xmx512m
+      - JAVA_TOOL_OPTIONS=-Xmx256m
     depends_on:
       - jaeger-collector
       - axon-server-1
@@ -143,7 +143,7 @@ services:
       - AXON_AXONSERVER_SERVERS=axon-server-1:8124
       - MM_TAG_APP=auction-query
       - MM_TAG_SERVER=morlack-laptop
-      - JAVA_TOOL_OPTIONS=-Xmx512m
+      - JAVA_TOOL_OPTIONS=-Xmx256m
     depends_on:
       - jaeger-collector
       - axon-server-1
@@ -161,7 +161,7 @@ services:
       - AXON_AXONSERVER_SERVERS=axon-server-1:8124
       - MM_TAG_APP=auctions
       - MM_TAG_SERVER=morlack-laptop
-      - JAVA_TOOL_OPTIONS=-Xmx512m
+      - JAVA_TOOL_OPTIONS=-Xmx256m
     depends_on:
       - jaeger-collector
       - axon-server-1
@@ -179,7 +179,7 @@ services:
       - AXON_AXONSERVER_SERVERS=axon-server-1:8124
       - MM_TAG_APP=interfaces
       - MM_TAG_SERVER=morlack-laptop
-      - JAVA_TOOL_OPTIONS=-Xmx512m
+      - JAVA_TOOL_OPTIONS=-Xmx256m
     depends_on:
       - jaeger-collector
       - axon-server-1

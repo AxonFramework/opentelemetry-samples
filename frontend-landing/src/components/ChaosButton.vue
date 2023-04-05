@@ -18,90 +18,68 @@
 
 import {ref} from "vue";
 
+interface ChaosTaints {
+    errorRate?: { rate: number, runtimeException?: boolean },
+    fixedDelay?: { delay: number },
+}
+
 interface ChaosSettings {
-  errorRate?: number,
-  delay?: number,
+    handlers?: ChaosTaints
+}
+
+interface EventChaosSettings extends ChaosSettings {
+    readAggregateStream?: ChaosTaints,
+    publishEvent?: ChaosTaints,
+    commitEvents?: ChaosTaints,
+}
+
+interface CommandChaosSettings extends ChaosSettings {
+    lockTime?: ChaosTaints,
+    dispatch?: ChaosTaints,
+    repositoryLoad?: ChaosTaints,
 }
 
 interface ApplicationChaosSettings {
-  queries?: ChaosSettings,
-  events?: ChaosSettings,
-  commands?: ChaosSettings,
+    query?: ChaosSettings,
+    events?: EventChaosSettings,
+    command?: CommandChaosSettings,
 }
 
 const props = defineProps<{
-  title: string,
-  auctions?: ApplicationChaosSettings,
-  objectRegistry?: ApplicationChaosSettings,
-  auctionQuery?: ApplicationChaosSettings,
-  participants?: ApplicationChaosSettings,
+    title: string,
+    auctions?: ApplicationChaosSettings,
+    objectRegistry?: ApplicationChaosSettings,
+    auctionQuery?: ApplicationChaosSettings,
+    participants?: ApplicationChaosSettings,
 }>()
 
 const map: { [key: string]: () => ApplicationChaosSettings | undefined } = {
-  "/service-participants": () => props.participants,
-  "/service-auction-object-registry": () => props.objectRegistry,
-  "/service-auction-query": () => props.auctionQuery,
-  "/service-auctions": () => props.auctions,
+    "/service-participants": () => props.participants,
+    "/service-auction-object-registry": () => props.objectRegistry,
+    "/service-auction-query": () => props.auctionQuery,
+    "/service-auctions": () => props.auctions,
 }
 
 const loading = ref(false)
 
 const setChaos = () => {
-  loading.value = true
-  Object.keys(map).forEach((baseUrl: string) => {
-    const result = map[baseUrl]();
-    const call: any = {
-      command: {
-        handlers: {
-          errorRate: null,
-          fixedDelay: null,
-        }
-      },
-      events: {
-        handlers: {
-          errorRate: null,
-          fixedDelay: null,
-        }
-      },
-      query: {
-        handlers: {
-          errorRate: null,
-          fixedDelay: null,
-        }
-      }
-    };
-    if (result?.commands?.delay) {
-      call.command.handlers.fixedDelay = {delay: result.commands.delay}
-    }
-    if (result?.commands?.errorRate) {
-      call.command.handlers.errorRate = {rate: result.commands.errorRate, runtimeException: true}
-    }
-    if (result?.queries?.delay) {
-      call.query.handlers.fixedDelay = {delay: result.queries.delay}
-    }
-    if (result?.queries?.errorRate) {
-      call.query.handlers.errorRate = {rate: result.queries.errorRate, runtimeException: true}
-    }
-    if (result?.events?.delay) {
-      call.events.handlers.fixedDelay = {delay: result.events.delay}
-    }
-    if (result?.events?.errorRate) {
-      call.events.handlers.errorRate = {rate: result.events.errorRate, runtimeException: true}
-    }
-
-    fetch(baseUrl + "/fire-starter/settings", {
-      method: 'POST',
-      body: JSON.stringify(call),
-      headers: {'Content-Type': 'application/json'}
-    }).then(() => {
-      loading.value = false
+    loading.value = true
+    Object.keys(map).forEach((baseUrl: string) => {
+        const result = map[baseUrl]() || {};
+        console.log(result)
+        fetch(baseUrl + "/fire-starter/settings", {
+            method: 'POST',
+            body: JSON.stringify(result),
+            headers: {'Content-Type': 'application/json'}
+        }).then(() => {
+            loading.value = false
+        })
     })
-  })
 }
 </script>
 
 <template>
-  <div class="btn btn-outline-secondary d-inline-block mx-2" @click="setChaos()">{{ title }}</div>
+    <div class="btn btn-outline-secondary btn-sm d-inline-block mx-2 mb-3" @click="setChaos()">{{ title }}</div>
 </template>
 
 <style scoped>

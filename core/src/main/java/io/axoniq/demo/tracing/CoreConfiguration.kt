@@ -17,14 +17,19 @@
 package io.axoniq.demo.tracing
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.axonframework.axonserver.connector.AxonServerConfiguration
+import org.axonframework.axonserver.connector.AxonServerConnectionManager
+import org.axonframework.axonserver.connector.event.axon.AxonServerEventStore
 import org.axonframework.common.transaction.TransactionManager
 import org.axonframework.config.ConfigurationScopeAwareProvider
 import org.axonframework.config.ConfigurerModule
-import org.axonframework.deadline.SimpleDeadlineManager
+import org.axonframework.deadline.jobrunr.JobRunrDeadlineManager
 import org.axonframework.eventhandling.PropagatingErrorHandler
+import org.axonframework.eventsourcing.snapshotting.SnapshotFilter
 import org.axonframework.serialization.Serializer
 import org.axonframework.serialization.json.JacksonSerializer
 import org.axonframework.tracing.SpanFactory
+import org.jobrunr.scheduling.JobScheduler
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
@@ -33,17 +38,37 @@ import org.springframework.scheduling.annotation.EnableScheduling
 
 @Configuration
 @EnableScheduling
-@Import(MetricsConfig::class)
+@Import(MetricsConfig::class, SpanFactoryConfiguration::class)
 class CoreConfiguration {
 
     @Bean
-    fun deadlineManager(configuration: org.axonframework.config.Configuration, spanFactory: SpanFactory) =
-        SimpleDeadlineManager
-            .builder()
-            .scopeAwareProvider(ConfigurationScopeAwareProvider(configuration))
-            .transactionManager(configuration.getComponent(TransactionManager::class.java))
-            .spanFactory(spanFactory)
-            .build()
+    fun deadlineManager(
+        configuration: org.axonframework.config.Configuration,
+        transactionManager: TransactionManager,
+        jobScheduler: JobScheduler,
+        serializer: Serializer,
+        spanFactory: SpanFactory,
+    ): JobRunrDeadlineManager = JobRunrDeadlineManager.builder()
+        .scopeAwareProvider(ConfigurationScopeAwareProvider(configuration))
+        .transactionManager(transactionManager)
+        .jobScheduler(jobScheduler)
+        .serializer(serializer)
+        .spanFactory(spanFactory)
+        .build()
+
+    @Bean
+    fun eventBus(
+        configuraton: AxonServerConfiguration,
+        connectionManager: AxonServerConnectionManager,
+        spanFactory: SpanFactory
+    ) = AxonServerEventStore.builder()
+        .eventSerializer(serializer())
+        .snapshotSerializer(serializer())
+        .configuration(configuraton)
+        .platformConnectionManager(connectionManager)
+        .spanFactory(spanFactory)
+        .snapshotFilter(SnapshotFilter.allowAll())
+        .build()
 
     @Bean
     @Primary

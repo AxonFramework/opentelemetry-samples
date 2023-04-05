@@ -13,8 +13,10 @@
     "lint": "eslint . --ext .vue,.ts,.tsx --fix --ignore-path .gitignore"
   },
   "dependencies": {
+    "@types/downloadjs": "^1.4.3",
     "bootstrap": "^5.2.3",
     "bootstrap-icons": "^1.10.2",
+    "downloadjs": "^1.4.7",
     "vue": "^3.2.45"
   },
   "devDependencies": {

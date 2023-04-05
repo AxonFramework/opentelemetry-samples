@@ -12,6 +12,7 @@ export default defineConfig(({}) => {
     ];
 
     return {
+        assetsInclude: ['assets/*.json'],
         plugins: plugins,
         resolve: {
             alias: {

@@ -16,6 +16,7 @@
 
 package io.axoniq.demo.tracing.objectregistry
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect
 import io.axoniq.demo.tracing.objectsregistry.AuctionObjectOwnerTransferred
 import io.axoniq.demo.tracing.objectsregistry.AuctionObjectSubmitted
 import io.axoniq.demo.tracing.objectsregistry.SubmitAuctionObject
@@ -27,7 +28,8 @@ import org.axonframework.modelling.command.AggregateIdentifier
 import org.axonframework.modelling.command.AggregateLifecycle
 import org.axonframework.spring.stereotype.Aggregate
 
-@Aggregate
+@Aggregate(snapshotTriggerDefinition = "snapshotTriggerDefinition")
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 class AuctionObject {
     @AggregateIdentifier
     private lateinit var id: String

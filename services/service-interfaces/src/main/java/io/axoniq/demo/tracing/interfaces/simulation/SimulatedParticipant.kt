@@ -220,7 +220,7 @@ class SimulatedParticipant(
 
     private fun maybeSellSomething() {
         val feelingFactor = Math.random()
-        if (feelingFactor <= 0.95) {
+        if (feelingFactor <= 0.96) {
             return
         }
         // I want to auction something!

@@ -17,41 +17,13 @@
 <script setup lang="ts">
 
 import {ref} from "vue";
+import type {ApplicationChaosSettings, ServiceChaosSettings} from "@/stores/chaos";
 
-interface ChaosTaints {
-    errorRate?: { rate: number, runtimeException?: boolean },
-    fixedDelay?: { delay: number },
-}
-
-interface ChaosSettings {
-    handlers?: ChaosTaints
-}
-
-interface EventChaosSettings extends ChaosSettings {
-    readAggregateStream?: ChaosTaints,
-    publishEvent?: ChaosTaints,
-    commitEvents?: ChaosTaints,
-}
-
-interface CommandChaosSettings extends ChaosSettings {
-    lockTime?: ChaosTaints,
-    dispatch?: ChaosTaints,
-    repositoryLoad?: ChaosTaints,
-}
-
-interface ApplicationChaosSettings {
-    query?: ChaosSettings,
-    events?: EventChaosSettings,
-    command?: CommandChaosSettings,
-}
-
-const props = defineProps<{
+interface Props extends ServiceChaosSettings{
     title: string,
-    auctions?: ApplicationChaosSettings,
-    objectRegistry?: ApplicationChaosSettings,
-    auctionQuery?: ApplicationChaosSettings,
-    participants?: ApplicationChaosSettings,
-}>()
+}
+
+const props = defineProps<Props>()
 
 const map: { [key: string]: () => ApplicationChaosSettings | undefined } = {
     "/service-participants": () => props.participants,

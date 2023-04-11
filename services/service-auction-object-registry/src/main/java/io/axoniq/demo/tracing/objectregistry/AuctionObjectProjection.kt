@@ -24,7 +24,7 @@ import org.axonframework.queryhandling.QueryUpdateEmitter
 import org.springframework.stereotype.Service
 
 @Service
-@ProcessingGroup("auction")
+@ProcessingGroup("auction-objects")
 class AuctionObjectProjection(
     private val queryUpdateEmitter: QueryUpdateEmitter,
     private val repository: AuctionObjectInfoRepository

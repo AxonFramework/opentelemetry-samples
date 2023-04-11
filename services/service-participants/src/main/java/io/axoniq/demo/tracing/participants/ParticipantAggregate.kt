@@ -16,6 +16,7 @@
 
 package io.axoniq.demo.tracing.participants
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect
 import org.axonframework.commandhandling.CommandHandler
 import org.axonframework.common.IdentifierFactory
 import org.axonframework.eventsourcing.EventSourcingHandler
@@ -23,7 +24,8 @@ import org.axonframework.modelling.command.AggregateIdentifier
 import org.axonframework.modelling.command.AggregateLifecycle.apply
 import org.axonframework.spring.stereotype.Aggregate
 
-@Aggregate
+@Aggregate(snapshotTriggerDefinition = "snapshotTriggerDefinition")
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 class ParticipantAggregate {
     @AggregateIdentifier
     private lateinit var id: String

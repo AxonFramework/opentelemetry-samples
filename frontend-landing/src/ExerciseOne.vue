@@ -63,7 +63,7 @@ import {delay, errorRate} from "@/utils";
         <p>Let's expand this dashboard! Based on the information of the presentation, we can create an effective
             dashboard.
             This dashboard could look something like
-            <a target="_blank" href="https://snapshots.raintank.io/dashboard/snapshot/iP4Mamt07RHbo1yzLcnIXPIIwRT0e1G7">the
+            <a target="_blank" href="https://snapshots.raintank.io/dashboard/snapshot/NwoqQnzBfWY9jFmlS2ro3HQ4oIfN8Xkb">the
                 one in this link</a>. So let's create this dashboard, by making a few panels.</p>
 
 
@@ -264,8 +264,9 @@ import {delay, errorRate} from "@/utils";
         </p>
         <ChaosButton title="Chaos configuration 1" :auction-query="{events: {handlers: {...delay(2000)}}}"/>
         <ChaosButton title="Chaos configuration 2" :auctions="{command: {handlers: {...errorRate(.25)}}}"/>
-        <ChaosButton title="Chaos configuration 3" :participants="{command: {handlers: {...delay(5000)}}}"/>
+        <ChaosButton title="Chaos configuration 3" :participants="{command: {handlers: {...delay(3000)}}}"/>
         <ChaosButton title="Chaos configuration 4" :participants="{command: {handlers: {...errorRate(.25)}}}"/>
+        <ChaosButton title="Chaos configuration 5" :auctions="{command: {handlers: {...delay(3000)}}}"/>
         <ChaosButton title="Reset"></ChaosButton>
     </ExerciseStep>
 

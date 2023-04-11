@@ -16,6 +16,7 @@
 
 package io.axoniq.demo.tracing.auction
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect
 import org.axonframework.commandhandling.CommandHandler
 import org.axonframework.common.IdentifierFactory
 import org.axonframework.deadline.DeadlineManager
@@ -27,12 +28,14 @@ import org.axonframework.spring.stereotype.Aggregate
 import org.springframework.beans.factory.annotation.Autowired
 import java.time.Instant
 
-@Aggregate
+@Aggregate(snapshotTriggerDefinition = "snapshotTriggerDefinition")
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 class Auction {
     @AggregateIdentifier
     private lateinit var id: String
     private lateinit var objectId: String
     private lateinit var owner: String
+    private lateinit var endTime: Instant
     private var minimalBid: Long = 0
     private var state = State.CREATED
     private val bids = mutableListOf<Bid>()
@@ -45,7 +48,7 @@ class Auction {
 
     @CommandHandler
     constructor(command: CreateAuction, @Autowired deadlineManager: DeadlineManager) {
-        val endTime = Instant.now().plusSeconds(4)
+        val endTime = Instant.now().plusSeconds(10)
         AggregateLifecycle.apply(
             AuctionCreated(
                 IdentifierFactory.getInstance().generateIdentifier(),
@@ -63,6 +66,9 @@ class Auction {
     fun on(command: PlaceBidOnAuction): Boolean {
         if (state != State.STARTED) {
             return false
+        }
+        if (Instant.now().isAfter(endTime)) {
+            return false;
         }
         val highest = winningBid?.amount ?: minimalBid
         if (highest >= command.price) {
@@ -99,6 +105,7 @@ class Auction {
         this.state = State.STARTED
         this.owner = event.owner
         this.minimalBid = event.minimumPrice
+        this.endTime = event.endTime
     }
 
     @EventSourcingHandler

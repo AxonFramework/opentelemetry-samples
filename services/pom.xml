@@ -20,7 +20,6 @@
         <module>service-auction-object-registry</module>
         <module>service-participants</module>
         <module>service-interfaces</module>
-        <module>service-allinclusive</module>
     </modules>
 
     <dependencies>

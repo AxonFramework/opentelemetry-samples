@@ -21,7 +21,6 @@ services:
     ports:
       - "9200:9200"
       - "9600:9600"
-
   jaeger-query:
     image: jaegertracing/jaeger-query:latest
     container_name: jaeger-query
@@ -81,16 +80,71 @@ services:
       - jaeger-collector
 
   axon-server-1:
-    image: axoniq/axonserver:4.6.5
+    image: axoniq/axonserver-enterprise:2023.0.0-jdk-17-dev
     ports:
       - "9024:8024"
       - "9124:8124"
     environment:
-      - JAVA_TOOL_OPTIONS=-Xmx256m
+      - axoniq_axonserver_hostname=axon-server-1
+      - axoniq_axonserver_internal_hostname=axon-server-1
+    env_file:
+      - axonserver-variables.env
     volumes:
-      - data-as-1:/axonserver/data
-      - events-as-1:/axonserver/events
-
+      - as-1-data:/axonserver/data
+      - as-1-events:/axonserver/events
+      - as-1-events-second-tier:/axonserver/events-secondtier
+      - as-1-plugins:/axonserver/plugins
+      - as-1-log:/axonserver/log
+      - ./axoniq.license:/axonserver/config/axoniq.license
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8024/actuator/health" ]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+  axon-server-2:
+    image: axoniq/axonserver-enterprise:2023.0.0-jdk-17-dev
+    ports:
+      - "9025:8024"
+      - "9125:8124"
+    environment:
+      - axoniq_axonserver_hostname=axon-server-2
+      - axoniq_axonserver_internal_hostname=axon-server-2
+    env_file:
+      - axonserver-variables.env
+    volumes:
+      - as-2-data:/axonserver/data
+      - as-2-events:/axonserver/events
+      - as-2-events-second-tier:/axonserver/events-secondtier
+      - as-2-plugins:/axonserver/plugins
+      - as-2-log:/axonserver/log
+      - ./axoniq.license:/axonserver/config/axoniq.license
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8024/actuator/health" ]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+  axon-server-3:
+    image: axoniq/axonserver-enterprise:2023.0.0-jdk-17-dev
+    ports:
+      - "9026:8024"
+      - "9126:8124"
+    environment:
+      - axoniq_axonserver_hostname=axon-server-3
+      - axoniq_axonserver_internal_hostname=axon-server-3
+    env_file:
+      - axonserver-variables.env
+    volumes:
+      - as-3-data:/axonserver/data
+      - as-3-events:/axonserver/events
+      - as-3-events-second-tier:/axonserver/events-secondtier
+      - as-3-plugins:/axonserver/plugins
+      - as-3-log:/axonserver/log
+      - ./axoniq.license:/axonserver/config/axoniq.license
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8024/actuator/health" ]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
 
   service-participants:
     image: morlack/axon-observability-service-participants
@@ -99,17 +153,31 @@ services:
     environment:
       - OTEL_RESOURCE_ATTRIBUTES=service.name\=Participants,service.version\=0.0.1,deployment.environment\=production
       - OTEL_SERVICE_NAME=Participants
-      - OTEL_TRACES_EXPORTER=jaeger
-      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger-collector:14250
-      - OTEL_METRICS_EXPORTER=none
-      - AXON_AXONSERVER_SERVERS=axon-server-1:8124
       - MM_TAG_APP=participants
-      - MM_TAG_SERVER=morlack-laptop
-      - JAVA_TOOL_OPTIONS=-Xmx256m
+      - spring_datasource_url=jdbc:postgresql://db-participants:5432/postgres
+    env_file:
+      - application-variables.env
     depends_on:
-      - jaeger-collector
-      - axon-server-1
-
+      jaeger-collector:
+        condition: service_started
+      db-participants:
+        condition: service_started
+      axon-server-1:
+        condition: service_healthy
+      axon-server-2:
+        condition: service_healthy
+      axon-server-3:
+        condition: service_healthy
+  db-participants:
+    image: postgres:14.1-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+#    volumes:
+#      - db-participants:/var/lib/postgresql/data
+    ports:
+      - '5434:5432'
 
   service-auction-object-registry:
     image: morlack/axon-observability-service-auction-object-registry
@@ -118,17 +186,31 @@ services:
     environment:
       - OTEL_RESOURCE_ATTRIBUTES=service.name\=AuctionObjectRegistry,service.version\=0.0.1,deployment.environment\=production
       - OTEL_SERVICE_NAME=AuctionObjectRegistry
-      - OTEL_TRACES_EXPORTER=jaeger
-      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger-collector:14250
-      - OTEL_METRICS_EXPORTER=none
-      - AXON_AXONSERVER_SERVERS=axon-server-1:8124
-      - MM_TAG_APP=auction-object-registry
-      - MM_TAG_SERVER=morlack-laptop
-      - JAVA_TOOL_OPTIONS=-Xmx256m
+      - MM_TAG_APP=object-registry
+      - spring_datasource_url=jdbc:postgresql://db-object-registry:5432/postgres
+    env_file:
+      - application-variables.env
     depends_on:
-      - jaeger-collector
-      - axon-server-1
-
+      jaeger-collector:
+        condition: service_started
+      db-object-registry:
+        condition: service_started
+      axon-server-1:
+        condition: service_healthy
+      axon-server-2:
+        condition: service_healthy
+      axon-server-3:
+        condition: service_healthy
+  db-object-registry:
+    image: postgres:14.1-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+#    volumes:
+#      - db-object-registry:/var/lib/postgresql/data
+    ports:
+      - '5435:5432'
 
   service-auction-query:
     image: morlack/axon-observability-service-auction-query
@@ -137,16 +219,32 @@ services:
     environment:
       - OTEL_RESOURCE_ATTRIBUTES=service.name\=AuctionQueries,service.version\=0.0.1,deployment.environment\=production
       - OTEL_SERVICE_NAME=AuctionQueries
-      - OTEL_TRACES_EXPORTER=jaeger
-      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger-collector:14250
-      - OTEL_METRICS_EXPORTER=none
-      - AXON_AXONSERVER_SERVERS=axon-server-1:8124
-      - MM_TAG_APP=auction-query
-      - MM_TAG_SERVER=morlack-laptop
-      - JAVA_TOOL_OPTIONS=-Xmx256m
+      - MM_TAG_APP=auctionquery
+      - spring_datasource_url=jdbc:postgresql://db-auction-query:5432/postgres
+    env_file:
+      - application-variables.env
+
     depends_on:
-      - jaeger-collector
-      - axon-server-1
+      jaeger-collector:
+        condition: service_started
+      db-auction-query:
+        condition: service_started
+      axon-server-1:
+        condition: service_healthy
+      axon-server-2:
+        condition: service_healthy
+      axon-server-3:
+        condition: service_healthy
+  db-auction-query:
+    image: postgres:14.1-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+#    volumes:
+#      - db-auctionquery:/var/lib/postgresql/data
+    ports:
+      - '5436:5432'
 
   service-auctions:
     image: morlack/axon-observability-service-auctions
@@ -155,16 +253,31 @@ services:
     environment:
       - OTEL_RESOURCE_ATTRIBUTES=service.name\=Auctions,service.version\=0.0.1,deployment.environment\=production
       - OTEL_SERVICE_NAME=Auctions
-      - OTEL_TRACES_EXPORTER=jaeger
-      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger-collector:14250
-      - OTEL_METRICS_EXPORTER=none
-      - AXON_AXONSERVER_SERVERS=axon-server-1:8124
       - MM_TAG_APP=auctions
-      - MM_TAG_SERVER=morlack-laptop
-      - JAVA_TOOL_OPTIONS=-Xmx256m
+      - spring_datasource_url=jdbc:postgresql://db-auctions:5432/postgres
+    env_file:
+      - application-variables.env
     depends_on:
-      - jaeger-collector
-      - axon-server-1
+      jaeger-collector:
+        condition: service_started
+      db-auctions:
+        condition: service_started
+      axon-server-1:
+        condition: service_healthy
+      axon-server-2:
+        condition: service_healthy
+      axon-server-3:
+        condition: service_healthy
+  db-auctions:
+    image: postgres:14.1-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+#    volumes:
+#      - db-auctions:/var/lib/postgresql/data
+    ports:
+      - '5437:5432'
 
   service-interfaces:
     image: morlack/axon-observability-service-interfaces
@@ -173,16 +286,31 @@ services:
     environment:
       - OTEL_RESOURCE_ATTRIBUTES=service.name\=Interfaces,service.version\=0.0.1,deployment.environment\=production
       - OTEL_SERVICE_NAME=Interfaces
-      - OTEL_TRACES_EXPORTER=jaeger
-      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger-collector:14250
-      - OTEL_METRICS_EXPORTER=none
-      - AXON_AXONSERVER_SERVERS=axon-server-1:8124
       - MM_TAG_APP=interfaces
-      - MM_TAG_SERVER=morlack-laptop
-      - JAVA_TOOL_OPTIONS=-Xmx256m
+      - spring_datasource_url=jdbc:postgresql://db-interfaces:5432/postgres
+    env_file:
+      - application-variables.env
     depends_on:
-      - jaeger-collector
-      - axon-server-1
+      jaeger-collector:
+        condition: service_started
+      db-interfaces:
+        condition: service_started
+      axon-server-1:
+        condition: service_healthy
+      axon-server-2:
+        condition: service_healthy
+      axon-server-3:
+        condition: service_healthy
+  db-interfaces:
+    image: postgres:14.1-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+#    volumes:
+#      - db-interfaces:/var/lib/postgresql/data
+    ports:
+      - '5438:5432'
 
 
   prometheus:
@@ -219,6 +347,7 @@ services:
     image: morlack/axon-observability-landing
     ports:
       - "8080:80"
+    restart: unless-stopped
     depends_on:
       - axon-server-1
       - jaeger-query
@@ -233,5 +362,23 @@ volumes:
   grafana-storage:
   prometheus-storage:
   opensearch-data1:
-  data-as-1:
-  events-as-1:
+  as-1-data:
+  as-1-events:
+  as-1-events-second-tier:
+  as-1-plugins:
+  as-1-log:
+  as-2-data:
+  as-2-events:
+  as-2-events-second-tier:
+  as-2-plugins:
+  as-2-log:
+  as-3-data:
+  as-3-events-second-tier:
+  as-3-events:
+  as-3-plugins:
+  as-3-log:
+  db-object-registry:
+  db-auctions:
+  db-auctionquery:
+  db-participants:
+  db-interfaces:

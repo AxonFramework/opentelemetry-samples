@@ -34,6 +34,7 @@ import org.axonframework.micrometer.TagsUtil;
 import org.axonframework.monitoring.MessageMonitor;
 import org.axonframework.monitoring.MultiMessageMonitor;
 import org.axonframework.queryhandling.QueryBus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -54,6 +55,13 @@ public class MetricsConfig {
             instrumentCommandBus(meterRegistry, configurer);
             instrumentQueryBus(meterRegistry, configurer);
         };
+    }
+
+    @Bean
+    public CapacityMetricProvider capacityMetricProvider(MeterRegistry meterRegistry,
+                                                         @Value("${axon.axonserver.query-threads:10}") Long queryThreads,
+                                                         @Value("${axon.axonserver.command-threads:10}") Long commandThreads) {
+        return new CapacityMetricProvider(meterRegistry, queryThreads, commandThreads);
     }
 
     private void instrumentEventStore(MeterRegistry meterRegistry, Configurer configurer) {

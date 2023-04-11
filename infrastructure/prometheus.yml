@@ -13,6 +13,8 @@ scrape_configs:
     static_configs:
       - targets:
           - axon-server-1:8024
+          - axon-server-2:8024
+          - axon-server-3:8024
   - job_name: axon-app
     honor_timestamps: true
     scrape_interval: 1s

@@ -25,6 +25,10 @@ import org.axonframework.config.ConfigurationScopeAwareProvider
 import org.axonframework.config.ConfigurerModule
 import org.axonframework.deadline.jobrunr.JobRunrDeadlineManager
 import org.axonframework.eventhandling.PropagatingErrorHandler
+import org.axonframework.eventsourcing.EventCountSnapshotTriggerDefinition
+import org.axonframework.eventsourcing.SnapshotTrigger
+import org.axonframework.eventsourcing.SnapshotTriggerDefinition
+import org.axonframework.eventsourcing.Snapshotter
 import org.axonframework.eventsourcing.snapshotting.SnapshotFilter
 import org.axonframework.serialization.Serializer
 import org.axonframework.serialization.json.JacksonSerializer
@@ -81,4 +85,7 @@ class CoreConfiguration {
     fun configurerModule() = ConfigurerModule {
         it.eventProcessing().registerDefaultListenerInvocationErrorHandler { PropagatingErrorHandler.INSTANCE }
     }
+
+    @Bean
+    fun snapshotTriggerDefinition(snapshotter: Snapshotter): SnapshotTriggerDefinition = EventCountSnapshotTriggerDefinition(snapshotter, 20)
 }

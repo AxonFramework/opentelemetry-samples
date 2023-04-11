@@ -15,6 +15,13 @@
 # limitations under the License.
 #
 
+
+cd frontend-landing
+docker build .
+docker build . -t morlack/axon-observability-landing
+docker push morlack/axon-observability-landing
+cd ..
+
 docker push morlack/axon-observability-service-auctions
 docker push morlack/axon-observability-service-auction-query
 docker push morlack/axon-observability-service-auction-object-registry
@@ -22,8 +29,3 @@ docker push morlack/axon-observability-service-participants
 docker push morlack/axon-observability-service-interfaces
 docker push morlack/axon-observability-service-allinclusive
 
-cd frontend-landing
-docker build .
-docker build . -t morlack/axon-observability-landing
-docker push morlack/axon-observability-landing
-cd ..

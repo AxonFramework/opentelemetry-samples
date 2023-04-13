@@ -214,8 +214,6 @@ services:
 
   service-auction-query:
     image: morlack/axon-observability-service-auction-query
-    ports:
-      - '8083:8080'
     environment:
       - OTEL_RESOURCE_ATTRIBUTES=service.name\=AuctionQueries,service.version\=0.0.1,deployment.environment\=production
       - OTEL_SERVICE_NAME=AuctionQueries

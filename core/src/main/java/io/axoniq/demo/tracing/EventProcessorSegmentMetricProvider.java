@@ -22,6 +22,7 @@ import jakarta.annotation.PostConstruct;
 import org.axonframework.common.AxonConfigurationException;
 import org.axonframework.config.EventProcessingConfiguration;
 import org.axonframework.eventhandling.StreamingEventProcessor;
+import org.axonframework.messaging.deadletter.SequencedDeadLetterQueue;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -48,10 +49,24 @@ public class EventProcessorSegmentMetricProvider {
                                                       .filter(segment -> !segment.isErrorState())
                                                       .mapToDouble(segment -> (double) 1 / (segment.getSegment().getMask() + 1))
                                                       .sum());
+
+                    configuration.deadLetterQueue(s).ifPresent(dlq -> {
+                        meterRegistry.gauge("eventProcessor_dlq_size",
+                                            Tags.of("eventProcessor", s),
+                                            dlq,
+                                            SequencedDeadLetterQueue::size);
+                    });
                 }
+
             });
         } catch (AxonConfigurationException e) {
             // Ignore, means there are no processors
         }
+
+        configuration.sequencedDeadLetterProcessor("bla").ifPresent(dlq -> {
+            dlq.process(deadLetter -> deadLetter.cause().map(s -> s.message().contains("FireStarter")).orElse(false));
+        });
     }
+
+
 }

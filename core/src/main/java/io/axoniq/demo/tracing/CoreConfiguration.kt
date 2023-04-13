@@ -42,7 +42,7 @@ import org.springframework.scheduling.annotation.EnableScheduling
 
 @Configuration
 @EnableScheduling
-@Import(MetricsConfig::class, SpanFactoryConfiguration::class)
+@Import(MetricsConfig::class, SpanFactoryConfiguration::class, EventProcessorSegmentMetricProvider::class)
 class CoreConfiguration {
 
     @Bean
@@ -78,7 +78,9 @@ class CoreConfiguration {
     @Primary
     fun serializer(): Serializer = JacksonSerializer.builder()
         .lenientDeserialization()
-        .objectMapper(ObjectMapper().findAndRegisterModules())
+        .objectMapper(
+            ObjectMapper().findAndRegisterModules()
+        )
         .build()
 
     @Bean
@@ -87,5 +89,6 @@ class CoreConfiguration {
     }
 
     @Bean
-    fun snapshotTriggerDefinition(snapshotter: Snapshotter): SnapshotTriggerDefinition = EventCountSnapshotTriggerDefinition(snapshotter, 20)
+    fun snapshotTriggerDefinition(snapshotter: Snapshotter): SnapshotTriggerDefinition =
+        EventCountSnapshotTriggerDefinition(snapshotter, 20)
 }

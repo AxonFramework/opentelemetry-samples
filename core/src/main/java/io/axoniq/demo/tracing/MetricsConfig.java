@@ -26,6 +26,7 @@ import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.eventhandling.StreamingEventProcessor;
 import org.axonframework.eventhandling.TrackingEventProcessor;
 import org.axonframework.eventsourcing.eventstore.EventStore;
+import org.axonframework.messaging.Message;
 import org.axonframework.micrometer.CapacityMonitor;
 import org.axonframework.micrometer.EventProcessorLatencyMonitor;
 import org.axonframework.micrometer.MessageCountingMonitor;

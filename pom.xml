@@ -52,11 +52,17 @@
             <artifactId>firestarter-spring-starter</artifactId>
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>io.axoniq.inspector</groupId>-->
-<!--            <artifactId>inspector-axon-spring-boot-starter</artifactId>-->
-<!--            <version>0.1.1</version>-->
-<!--        </dependency>-->
+        <dependency>
+            <groupId>io.axoniq.inspector</groupId>
+            <artifactId>inspector-axon-spring-boot-starter</artifactId>
+            <version>0.1.4</version>
+        </dependency>
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-spring-boot-autoconfigure</artifactId>
+            <!-- TODO: Make patch out of this -->
+            <version>4.7.5-SNAPSHOT</version>
+        </dependency>
         <!-- Axon -->
         <dependency>
             <groupId>org.axonframework</groupId>

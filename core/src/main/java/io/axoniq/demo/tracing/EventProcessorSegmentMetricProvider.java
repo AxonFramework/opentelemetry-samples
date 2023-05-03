@@ -62,10 +62,6 @@ public class EventProcessorSegmentMetricProvider {
         } catch (AxonConfigurationException e) {
             // Ignore, means there are no processors
         }
-
-        configuration.sequencedDeadLetterProcessor("bla").ifPresent(dlq -> {
-            dlq.process(deadLetter -> deadLetter.cause().map(s -> s.message().contains("FireStarter")).orElse(false));
-        });
     }
 
 

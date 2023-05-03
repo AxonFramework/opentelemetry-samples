@@ -26,7 +26,6 @@ import org.axonframework.config.ConfigurerModule
 import org.axonframework.deadline.jobrunr.JobRunrDeadlineManager
 import org.axonframework.eventhandling.PropagatingErrorHandler
 import org.axonframework.eventsourcing.EventCountSnapshotTriggerDefinition
-import org.axonframework.eventsourcing.SnapshotTrigger
 import org.axonframework.eventsourcing.SnapshotTriggerDefinition
 import org.axonframework.eventsourcing.Snapshotter
 import org.axonframework.eventsourcing.snapshotting.SnapshotFilter
@@ -42,7 +41,7 @@ import org.springframework.scheduling.annotation.EnableScheduling
 
 @Configuration
 @EnableScheduling
-@Import(MetricsConfig::class, SpanFactoryConfiguration::class, EventProcessorSegmentMetricProvider::class)
+@Import(MetricsConfig::class, EventProcessorSegmentMetricProvider::class)
 class CoreConfiguration {
 
     @Bean

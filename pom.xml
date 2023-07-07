@@ -40,7 +40,7 @@
         <java.version>17</java.version>
         <axon.version>4.7.1-SNAPSHOT</axon.version>
         <kotlin.version>1.7.20</kotlin.version>
-        <h2.version>1.4.200</h2.version>
+        <h2.version>2.2.220</h2.version>
     </properties>
 
     <dependencies>
